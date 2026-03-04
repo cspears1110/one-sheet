@@ -1,5 +1,5 @@
 import React from 'react';
-import { PositionedSection, calculateTimeSigGap } from '../../lib/layout';
+import { PositionedSection, calculateTimeSigGap, wrapText } from '../../lib/layout';
 
 interface Props {
     positioned: PositionedSection;
@@ -150,14 +150,14 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
         <g transform={`translate(${x}, ${y})`}>
             {/* Tempo Marking */}
             {section.tempo && (
-                <text x={8} y={-36} fill="black" fontSize={12} fontWeight="bold" fontFamily="sans-serif">
+                <text x={8} y={-36} fill="black" fontSize={14} fontWeight="bold" fontFamily="sans-serif">
                     {formatTempoText(section.tempo)}
                 </text>
             )}
 
             {/* Start Measure Number */}
             {!isFirstChild && (
-                <text x={4} y={isCurlyBrace ? -16 : -4} fill="black" fontSize={12} fontFamily="sans-serif" textAnchor="start">
+                <text x={4} y={isCurlyBrace ? -16 : -4} fill="black" fontSize={12} fontWeight="bold" fontFamily="sans-serif" textAnchor="start">
                     {positioned.startMeasure}
                 </text>
             )}
@@ -203,7 +203,7 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
             {/* Optional Section Text underneath Title (or replacing it if empty) */}
             {section.text && (
                 <text x={section.timeSignature ? calculateTimeSigGap(section.timeSignature) + 4 : 8} y={section.title ? 40 : 24} fill="gray" fontSize={12} fontFamily="sans-serif">
-                    {section.text.split('\n').map((lineStr, i) => (
+                    {wrapText(section.text, width - calculateTimeSigGap(section.timeSignature) - 16).lines.map((lineStr, i) => (
                         <tspan key={i} x={section.timeSignature ? calculateTimeSigGap(section.timeSignature) + 4 : 8} dy={i === 0 ? 0 : 16}>
                             {lineStr}
                         </tspan>

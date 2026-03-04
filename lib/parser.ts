@@ -6,6 +6,7 @@ export interface ParsedComposition {
     subtitle: string;
     composer: string;
     arranger: string;
+    createdBy: string;
     sections: Section[];
 }
 
@@ -18,17 +19,19 @@ export function parseCompositionText(text: string): ParsedComposition {
     let subtitle = '';
     let composer = '';
     let arranger = '';
+    let createdBy = '';
 
     for (const line of lines) {
         // Metadata parsing (e.g. "Title: Symphony No. 5")
-        const metaMatch = line.match(/^(Title|Subtitle|Composer|Arranger|Created By):\s*(.*)$/i);
+        const metaMatch = line.match(/^(Title|Subtitle|Composer|Created By|Arranger|Transcriber):\s*(.*)$/i);
         if (metaMatch) {
             const key = metaMatch[1].toLowerCase();
             const val = metaMatch[2].trim();
             if (key === 'title') title = val;
             if (key === 'subtitle') subtitle = val;
             if (key === 'composer') composer = val;
-            if (key === 'arranger' || key === 'created by') arranger = val;
+            if (key === 'arranger' || key === 'transcriber') arranger = val;
+            if (key === 'created by') createdBy = val;
             continue;
         }
 
@@ -104,5 +107,5 @@ export function parseCompositionText(text: string): ParsedComposition {
         stack.push({ section: newSection, level });
     }
 
-    return { title, subtitle, composer, arranger, sections };
+    return { title, subtitle, composer, arranger, createdBy, sections };
 }

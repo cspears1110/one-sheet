@@ -52,7 +52,7 @@ export function HeaderRenderer({ composition, config }: Props) {
                 {composition.composer}
             </text>
 
-            {/* Arranger / Creator */}
+            {/* Arranger */}
             {composition.arranger && (
                 <text
                     x={config.maxWidth}

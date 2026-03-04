@@ -67,7 +67,7 @@ export function CanvasRenderer() {
     const offsetX = 40 + ((currentConfig.maxWidth - scaledWidth) / 2);
 
     return (
-        <div className="w-full h-full overflow-hidden bg-[#FDFBF7] p-8 flex items-center justify-center print:block print:p-0 print:bg-white">
+        <div className="w-full h-full overflow-hidden bg-background p-8 flex items-center justify-center print:block print:p-0 print:bg-white">
             <style type="text/css">
                 {`
                     @media print {
@@ -104,6 +104,21 @@ export function CanvasRenderer() {
                         </g>
                     ))}
                 </g>
+
+                {/* Footer / Created By */}
+                {composition.createdBy && (
+                    <text
+                        x={widthLimit / 2}
+                        y={heightLimit - 40}
+                        textAnchor="middle"
+                        fontSize={10}
+                        fontStyle="italic"
+                        fontFamily="sans-serif"
+                        fill="gray"
+                    >
+                        OneSheet by {composition.createdBy}
+                    </text>
+                )}
             </svg>
         </div>
     );

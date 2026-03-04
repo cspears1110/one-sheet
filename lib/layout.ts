@@ -71,6 +71,45 @@ export function calculateTimeSigGap(timeSig?: string): number {
     return gap;
 }
 
+// Helper to wrap text into lines based on an approximate pixel width per character.
+// Returns the array of lines and the maximum actual width used.
+export function wrapText(text: string, maxPixelWidth: number, approxCharWidth = 6.5): { lines: string[], actualMaxWidth: number } {
+    if (!text) return { lines: [], actualMaxWidth: 0 };
+
+    // Hard breaks encoded by user
+    const paragraphs = text.split('\n');
+    const displayLines: string[] = [];
+    let absoluteMaxWidth = 0;
+
+    paragraphs.forEach(p => {
+        const words = p.split(' ');
+        let currentLine = '';
+
+        words.forEach(word => {
+            const testLine = currentLine ? `${currentLine} ${word}` : word;
+            const testWidth = testLine.length * approxCharWidth;
+
+            if (testWidth > maxPixelWidth && currentLine) {
+                // Wrap to next line
+                displayLines.push(currentLine);
+                const currentWidth = currentLine.length * approxCharWidth;
+                if (currentWidth > absoluteMaxWidth) absoluteMaxWidth = currentWidth;
+                currentLine = word;
+            } else {
+                currentLine = testLine;
+            }
+        });
+
+        if (currentLine) {
+            displayLines.push(currentLine);
+            const currentWidth = currentLine.length * approxCharWidth;
+            if (currentWidth > absoluteMaxWidth) absoluteMaxWidth = currentWidth;
+        }
+    });
+
+    return { lines: displayLines, actualMaxWidth: absoluteMaxWidth };
+}
+
 // Helper to determine the minimum dimensions required for a section subtree
 function calculateMinDimensions(section: Section, config: LayoutConfig): { width: number; depth: number } {
     // Determine the minimum width needed to fit this section's own title
@@ -84,7 +123,18 @@ function calculateMinDimensions(section: Section, config: LayoutConfig): { width
     const tempoWidth = section.tempo ? Math.max(section.tempo.length * 9, 80) : 0;
     const timeSigGap = calculateTimeSigGap(section.timeSignature);
 
-    const selfMinWidth = Math.max(textWidth + annotationsWidth, tempoWidth) + timeSigGap;
+    let selfMinWidth = Math.max(textWidth + annotationsWidth, tempoWidth) + timeSigGap;
+
+    // Expand width if there is descriptive text.
+    // We allow descriptive text to expand up to config.baseSectionWidth, or more if it's a single long un-wrappable word.
+    if (section.text) {
+        // Try wrapping the text using a max pixel width (e.g., config.baseSectionWidth or remaining width)
+        const wrapperMaxWidth = Math.max(selfMinWidth, config.baseSectionWidth * 1.5);
+        const { actualMaxWidth } = wrapText(section.text, wrapperMaxWidth);
+        if (actualMaxWidth + timeSigGap + 16 > selfMinWidth) {
+            selfMinWidth = actualMaxWidth + timeSigGap + 16;
+        }
+    }
 
     if (section.subSections.length === 0) {
         return { width: selfMinWidth, depth: 1 };
@@ -117,7 +167,9 @@ function layoutSectionCoordinates(
 ): PositionedSection {
     let textHeightOffset = 0;
     if (section.text) {
-        textHeightOffset = section.text.split('\n').length * 16 + 8;
+        const { lines } = wrapText(section.text, assignedWidth - calculateTimeSigGap(section.timeSignature) - 16);
+        // Multiply by line height (16px) + extra padding
+        textHeightOffset = lines.length * 16 + 8;
     }
 
     const baseHeight = config.levelHeight + textHeightOffset;
@@ -163,9 +215,22 @@ function layoutSectionCoordinates(
         });
 
         positioned.subtreeHeight = yOffsetForChildren + maxChildSubtreeHeight;
+
+        positioned.children.forEach(child => {
+            extendSubtreeHeight(child, maxChildSubtreeHeight);
+        });
     }
 
     return positioned;
+}
+
+function extendSubtreeHeight(posn: PositionedSection, targetHeight: number) {
+    posn.subtreeHeight = targetHeight;
+    if (posn.children.length > 0) {
+        const yOffset = posn.children[0].y;
+        const childTargetHeight = targetHeight - yOffset;
+        posn.children.forEach(child => extendSubtreeHeight(child, childTargetHeight));
+    }
 }
 
 export function computeLayout(composition: Composition, config: LayoutConfig): Staff[] {
@@ -185,6 +250,10 @@ export function computeLayout(composition: Composition, config: LayoutConfig): S
         const tempoPadding = hasTempo ? 40 : 0;
 
         const maxSubtreeHeight = Math.max(...currentStaffSections.map(s => s.subtreeHeight));
+
+        currentStaffSections.forEach(s => {
+            extendSubtreeHeight(s, maxSubtreeHeight);
+        });
 
         const staffHeight = maxSubtreeHeight + 40 + tempoPadding; // padding
         staves.push({

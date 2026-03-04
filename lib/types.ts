@@ -25,6 +25,7 @@ export interface Composition {
   subtitle?: string;
   composer: string;
   arranger?: string;
+  createdBy?: string;
   sections: Section[];
 }
 
