@@ -179,7 +179,7 @@ function SectionCard({ item, depth, index, isCollapsed, hasChildren, isActive, o
                                     </span>
                                 </div>
                             )}
-                            <DropdownMenu>
+                            <DropdownMenu onOpenChange={(open) => { if (open) onClick(); }}>
                                 <DropdownMenuTrigger asChild>
                                     <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8 text-muted-foreground hover:text-foreground">
                                         <MoreVertical className="w-4 h-4" />
@@ -216,7 +216,6 @@ function SectionCard({ item, depth, index, isCollapsed, hasChildren, isActive, o
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem onClick={onAddSubsection}>
                                         <Plus className="w-4 h-4 mr-2" /> Add Sub-section
-                                        <DropdownMenuShortcut>⌘↵</DropdownMenuShortcut>
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem onClick={onMoveUp}>

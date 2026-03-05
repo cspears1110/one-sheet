@@ -2,6 +2,7 @@ import React from 'react';
 import { useStore } from '../lib/store';
 import { PageSize, PageOrientation } from '../lib/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export function SettingsEditor() {
     const { pageConfig, setPageConfig, theme, setTheme } = useStore();
@@ -47,18 +48,12 @@ export function SettingsEditor() {
 
                     <div className="space-y-1.5 pt-4 border-t border-border">
                         <label className="text-xs font-semibold text-muted-foreground block">Appearance</label>
-                        <Select
-                            value={theme}
-                            onValueChange={(value) => setTheme(value as 'light' | 'dark')}
-                        >
-                            <SelectTrigger className="w-full text-sm h-9 shadow-none">
-                                <SelectValue placeholder="Select theme" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="light">Light Mode</SelectItem>
-                                <SelectItem value="dark">Dark Mode</SelectItem>
-                            </SelectContent>
-                        </Select>
+                        <Tabs value={theme} onValueChange={(value) => setTheme(value as 'light' | 'dark')} className="w-full">
+                            <TabsList className="grid w-full grid-cols-2">
+                                <TabsTrigger value="light">Light</TabsTrigger>
+                                <TabsTrigger value="dark">Dark</TabsTrigger>
+                            </TabsList>
+                        </Tabs>
                     </div>
                 </div>
             </div>

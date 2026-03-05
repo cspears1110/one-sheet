@@ -112,18 +112,28 @@ export function wrapText(text: string, maxPixelWidth: number, approxCharWidth = 
 
 // Helper to determine the minimum dimensions required for a section subtree
 function calculateMinDimensions(section: Section, config: LayoutConfig): { width: number; depth: number } {
-    // Determine the minimum width needed to fit this section's own title
-    const titleText = section.title;
-    // Approximate SVG text width: ~9 pixels per character for font-size 14/bold. Add 30px padding for the brace ticks.
+    const startMeasureStrWidth = section.startMeasure.toString().length * 7; // Approx 7px per char at fontSize 12
+    const rangeStrWidth = section.showMeasureCount ?
+        ((section.endMeasure - section.startMeasure + 1).toString().length * 7) :
+        (`${section.startMeasure}-${section.endMeasure}`.length * 7);
+
+    // To prevent overlap: Left item ends at (4 + startMeasureStrWidth + padding).
+    // Center item begins at (width / 2 - rangeStrWidth / 2).
+    // So: width / 2 >= 4 + startMeasureStrWidth + padding + rangeStrWidth / 2
+    // width >= 2 * (4 + startMeasureStrWidth + padding) + rangeStrWidth
+    const padding = 4;
+    const minMeasureTextWidth = 2 * (4 + startMeasureStrWidth + padding) + rangeStrWidth;
+
     // Ensure there's a minimum baseline width so tiny titles or measure counts don't get squished.
-    const textWidth = Math.max((titleText.length * 9) + 40, 60);
+    const titleText = section.title || '';
+    const textWidth = Math.max((titleText.length * 9) + 40, 60, minMeasureTextWidth);
 
     // Add additional width if there are annotations or tempo markings
     const annotationsWidth = section.annotations.length > 0 ? 50 : 0;
     const tempoWidth = section.tempo ? Math.max(section.tempo.length * 9, 80) : 0;
     const timeSigGap = calculateTimeSigGap(section.timeSignature);
 
-    let selfMinWidth = Math.max(textWidth + annotationsWidth, tempoWidth) + timeSigGap;
+    let selfMinWidth = Math.max(textWidth + annotationsWidth, tempoWidth, minMeasureTextWidth) + timeSigGap;
 
     // Expand width if there is descriptive text.
     // We allow descriptive text to expand up to config.baseSectionWidth, or more if it's a single long un-wrappable word.
@@ -192,7 +202,7 @@ function layoutSectionCoordinates(
 
         // Check if any child section has a tempo marking to inject vertical margin
         const anyChildHasTempo = section.subSections.some(sub => sub.tempo);
-        const yOffsetForChildren = baseHeight + (anyChildHasTempo ? 44 : 0);
+        const yOffsetForChildren = baseHeight + (anyChildHasTempo ? 30 : 0);
 
         positioned.height = yOffsetForChildren; // Ensure the vertical black line extends exactly to the children
 
