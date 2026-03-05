@@ -9,6 +9,7 @@ export interface Annotation {
 export interface Section {
   id: string;
   title: string;
+  editorLabel?: string;
   startMeasure: number;
   endMeasure: number;
   subSections: Section[]; // Recursive structure

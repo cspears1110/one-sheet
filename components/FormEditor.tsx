@@ -87,7 +87,7 @@ interface SectionCardProps {
 }
 
 function SectionCard({ item, depth, index, isCollapsed, hasChildren, isActive, onClick, onToggleCollapse, onChange, onDelete, onMoveUp, onMoveDown, onPromote, onDemote, onAddSubsection }: SectionCardProps) {
-    const [showTitle, setShowTitle] = useState(!!item.title);
+    const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [showTempo, setShowTempo] = useState(!!item.tempo);
     const [showTime, setShowTime] = useState(!!item.timeSignature);
     const [showText, setShowText] = useState(!!item.text);
@@ -131,7 +131,7 @@ function SectionCard({ item, depth, index, isCollapsed, hasChildren, isActive, o
                                     <span className="font-semibold text-sm truncate">{item.title}</span>
                                 ) : (
                                     <span className="text-sm font-semibold text-muted-foreground italic truncate drop-shadow-sm">
-                                        Section {index + 1}
+                                        {'editorLabel' in item && item.editorLabel ? item.editorLabel : 'Untitled Section'}
                                     </span>
                                 )}
                                 <span className="text-[10px] text-muted-foreground font-medium shrink-0">
@@ -142,17 +142,42 @@ function SectionCard({ item, depth, index, isCollapsed, hasChildren, isActive, o
                         </div>
                     ) : (
                         <>
-                            {!showTitle ? (
-                                <div className="h-8 flex text-sm font-semibold text-muted-foreground items-center flex-1 italic drop-shadow-sm">
-                                    Section {index + 1}
-                                </div>
-                            ) : (
+                            {isEditingTitle ? (
                                 <Input
+                                    autoFocus
                                     value={item.title}
                                     onChange={e => onChange('title', e.target.value)}
-                                    placeholder="Section Title"
+                                    onBlur={() => setIsEditingTitle(false)}
+                                    onKeyDown={e => {
+                                        if (e.key === 'Enter') setIsEditingTitle(false);
+                                    }}
+                                    placeholder={'editorLabel' in item && item.editorLabel ? item.editorLabel : "Section Title"}
                                     className="h-8 font-semibold shadow-none border-dashed bg-muted/50 hover:bg-background focus:bg-background cursor-text flex-1"
                                 />
+                            ) : item.title ? (
+                                <div className="h-8 flex text-sm font-semibold items-center flex-1 truncate">
+                                    <span
+                                        className="cursor-text hover:opacity-70 transition-opacity"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setIsEditingTitle(true);
+                                        }}
+                                    >
+                                        {item.title}
+                                    </span>
+                                </div>
+                            ) : (
+                                <div className="h-8 flex text-sm font-semibold text-muted-foreground items-center flex-1 italic drop-shadow-sm">
+                                    <span
+                                        className="cursor-text hover:text-foreground transition-colors"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setIsEditingTitle(true);
+                                        }}
+                                    >
+                                        {'editorLabel' in item && item.editorLabel ? item.editorLabel : 'Untitled Section'}
+                                    </span>
+                                </div>
                             )}
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
@@ -161,12 +186,6 @@ function SectionCard({ item, depth, index, isCollapsed, hasChildren, isActive, o
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-48">
-                                    <DropdownMenuCheckboxItem
-                                        checked={showTitle}
-                                        onCheckedChange={(c) => { setShowTitle(c); if (!c && item.title) onChange('title', ''); }}
-                                    >
-                                        Title
-                                    </DropdownMenuCheckboxItem>
                                     <DropdownMenuCheckboxItem
                                         checked={showTempo}
                                         onCheckedChange={(c) => { setShowTempo(c); if (!c && item.tempo) onChange('tempo', undefined); }}
@@ -377,9 +396,17 @@ export function FormEditor() {
         if (index === -1) return;
 
         const parentItem = flattenedItems[index];
+
+        let siblingCount = 0;
+        for (let i = index + 1; i < flattenedItems.length; i++) {
+            if (flattenedItems[i].depth <= parentItem.depth) break;
+            if (flattenedItems[i].depth === parentItem.depth + 1) siblingCount++;
+        }
+
         const newSection: FlattenedItem = {
             id: uuidv4(),
             title: '',
+            editorLabel: `Subsection ${siblingCount + 1}`,
             startMeasure: parentItem.startMeasure, // Default to parent's start
             endMeasure: parentItem.endMeasure,     // Default to parent's end
             subSections: [],
@@ -392,32 +419,62 @@ export function FormEditor() {
         updateCompositionAndSync(prev => ({ ...prev, sections: buildTreeFromFlatWithDepth(newItems) }));
     };
 
+    const handleAddSiblingSection = (id: string) => {
+        const index = flattenedItems.findIndex(i => i.id === id);
+        if (index === -1) return;
+
+        const referenceItem = flattenedItems[index];
+
+        let siblingCount = 0;
+        if (referenceItem.depth === 0) {
+            siblingCount = flattenedItems.filter(i => i.depth === 0).length;
+        } else {
+            let parentIndex = -1;
+            for (let i = index - 1; i >= 0; i--) {
+                if (flattenedItems[i].depth === referenceItem.depth - 1) {
+                    parentIndex = i;
+                    break;
+                }
+            }
+            if (parentIndex !== -1) {
+                for (let i = parentIndex + 1; i < flattenedItems.length; i++) {
+                    if (flattenedItems[i].depth <= flattenedItems[parentIndex].depth) break;
+                    if (flattenedItems[i].depth === referenceItem.depth) siblingCount++;
+                }
+            }
+        }
+
+        const newId = uuidv4();
+        const newSection: FlattenedItem = {
+            id: newId,
+            title: '',
+            editorLabel: referenceItem.depth === 0 ? `Section ${siblingCount + 1}` : `Subsection ${siblingCount + 1}`,
+            startMeasure: referenceItem.endMeasure,
+            endMeasure: referenceItem.endMeasure,
+            subSections: [],
+            annotations: [],
+            depth: referenceItem.depth
+        };
+
+        let insertIndex = index;
+        for (let i = index + 1; i < flattenedItems.length; i++) {
+            if (flattenedItems[i].depth <= referenceItem.depth) break;
+            insertIndex = i;
+        }
+
+        const newItems = [...flattenedItems];
+        newItems.splice(insertIndex + 1, 0, newSection);
+        updateCompositionAndSync(prev => ({ ...prev, sections: buildTreeFromFlatWithDepth(newItems) }));
+
+        setTimeout(() => setActiveSectionId(newId), 50);
+    };
+
     const handleFieldChange = (id: string, field: keyof Section, value: any) => {
         const targetIndex = flattenedItems.findIndex(i => i.id === id);
         if (targetIndex === -1) return;
 
-        let delta = 0;
-        if (field === 'startMeasure' || field === 'endMeasure') {
-            const oldValue = flattenedItems[targetIndex][field] as number || 0;
-            const newValue = value as number || 0;
-            delta = newValue - oldValue;
-        }
-
         const newItems = [...flattenedItems];
         newItems[targetIndex] = { ...newItems[targetIndex], [field]: value };
-
-        if (delta !== 0) {
-            const targetDepth = newItems[targetIndex].depth;
-            for (let i = targetIndex + 1; i < newItems.length; i++) {
-                if (newItems[i].depth <= targetDepth) break; // Reached sibling/parent, stop cascading
-
-                newItems[i] = {
-                    ...newItems[i],
-                    startMeasure: (newItems[i].startMeasure || 0) + delta,
-                    endMeasure: (newItems[i].endMeasure || 0) + delta
-                };
-            }
-        }
 
         updateCompositionAndSync(prev => ({ ...prev, sections: buildTreeFromFlatWithDepth(newItems) }));
     };
@@ -482,21 +539,25 @@ export function FormEditor() {
     };
 
     const handleAddSection = () => {
-        const newSection: Section = {
-            id: uuidv4(),
-            title: '',
-            startMeasure: 0,
-            endMeasure: 0,
-            subSections: [],
-            annotations: []
-        };
-        updateCompositionAndSync(prev => ({
-            ...prev,
-            sections: [...prev.sections, newSection]
-        }));
+        const id = uuidv4();
+        updateCompositionAndSync(prev => {
+            const newSection: Section = {
+                id,
+                title: '',
+                editorLabel: `Section ${prev.sections.length + 1}`,
+                startMeasure: 0,
+                endMeasure: 0,
+                subSections: [],
+                annotations: []
+            };
+            return {
+                ...prev,
+                sections: [...prev.sections, newSection]
+            };
+        });
 
         // Auto-focus the newly created section
-        setTimeout(() => setActiveSectionId(newSection.id), 50);
+        setTimeout(() => setActiveSectionId(id), 50);
     };
 
     const handleMetaChange = (field: keyof typeof composition, value: string) => {
@@ -532,6 +593,12 @@ export function FormEditor() {
                 case 'Delete':
                     e.preventDefault();
                     handleDelete(activeSectionId);
+                    break;
+                case 'Enter':
+                    if (e.metaKey || e.ctrlKey) {
+                        e.preventDefault();
+                        handleAddSiblingSection(activeSectionId);
+                    }
                     break;
                 case 'ArrowRight':
                     if (e.metaKey || e.ctrlKey) {
@@ -573,7 +640,7 @@ export function FormEditor() {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [activeSectionId, visibleItems, handleDelete, handlePromote, handleDemote, handleMoveUp, handleMoveDown, handleAddSection, handleAddSubsection]);
+    }, [activeSectionId, visibleItems, handleDelete, handlePromote, handleDemote, handleMoveUp, handleMoveDown, handleAddSection, handleAddSubsection, handleAddSiblingSection]);
 
     return (
         <div className="flex flex-col space-y-6">
@@ -647,7 +714,10 @@ export function FormEditor() {
                     className="w-full border-dashed text-muted-foreground"
                     onClick={handleAddSection}
                 >
-                    <Plus className="w-4 h-4 mr-2" /> Add Section
+                    <div className="flex items-center justify-center w-full">
+                        <Plus className="w-4 h-4 mr-2" /> Add Section
+                        <span className="ml-2 text-[10px] font-sans tracking-widest opacity-60">⌘↵</span>
+                    </div>
                 </Button>
             </div>
 
