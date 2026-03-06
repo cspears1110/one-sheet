@@ -36,7 +36,7 @@ export function parseCompositionText(text: string): ParsedComposition {
         }
 
         // Tempo Parsing (e.g. "Tempo: Animé [q] = 138")
-        const tempoMatch = line.match(/^Tempo:\s*(.*)$/i);
+        const tempoMatch = line.match(/^[ \t]*Tempo:\s*(.*)$/i);
         if (tempoMatch) {
             const tempoVal = tempoMatch[1].trim();
             if (stack.length > 0) {
@@ -48,7 +48,7 @@ export function parseCompositionText(text: string): ParsedComposition {
         }
 
         // Time Signature Parsing (e.g. "Time: 4/4" or "Time: Cut")
-        const timeMatch = line.match(/^Time:\s*(.*)$/i);
+        const timeMatch = line.match(/^[ \t]*Time:\s*(.*)$/i);
         if (timeMatch) {
             const timeVal = timeMatch[1].trim();
             if (stack.length > 0) {
@@ -60,7 +60,7 @@ export function parseCompositionText(text: string): ParsedComposition {
         }
 
         // Text parsing (e.g. "Text: Some description\nLine 2")
-        const textMatch = line.match(/^Text:\s*(.*)$/i);
+        const textMatch = line.match(/^[ \t]*Text:\s*(.*)$/i);
         if (textMatch) {
             const textVal = textMatch[1].trim().replace(/\\n/g, '\n');
             if (stack.length > 0) {
@@ -71,10 +71,20 @@ export function parseCompositionText(text: string): ParsedComposition {
             continue;
         }
 
-        const match = line.match(/^(#{1,6})(?:(?:[ \t]+)(.*?))?(?:[ \t]*\((\d+)\s*-\s*(\d+)(\*?)\))?\s*$/);
+        if (line.trim() === '') continue;
+
+        const match = line.match(/^([ \t]*)(.*?)(?:[ \t]*\((\d+)\s*-\s*(\d+)(\*?)\))?\s*$/);
         if (!match) continue; // Skip unparseable lines
 
-        const level = match[1].length;
+        const indentStr = match[1];
+        let spaces = 0;
+        let tabs = 0;
+        for (let i = 0; i < indentStr.length; i++) {
+            if (indentStr[i] === '\t') tabs++;
+            else if (indentStr[i] === ' ') spaces++;
+        }
+
+        const level = 1 + tabs + Math.floor(spaces / 2);
         let sectionTitle = match[2] ? match[2].trim() : '';
         let startMeasure = match[3] ? parseInt(match[3], 10) : 0;
         let endMeasure = match[4] ? parseInt(match[4], 10) : -1;

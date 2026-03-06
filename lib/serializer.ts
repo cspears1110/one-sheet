@@ -17,28 +17,29 @@ export function serializeComposition(composition: Composition): string {
 
     // 2. Serialize Nested Sections recursively
     const serializeSection = (section: Section, level: number) => {
-        const hashes = '#'.repeat(level);
+        const tabs = '\t'.repeat(level - 1);
 
         let bounds = '';
         if (section.endMeasure >= section.startMeasure) {
-            bounds = ` (${section.startMeasure}-${section.endMeasure}${section.showMeasureCount ? '*' : ''})`;
+            bounds = `(${section.startMeasure}-${section.endMeasure}${section.showMeasureCount ? '*' : ''})`;
         } else if (section.startMeasure > 0) {
-            bounds = ` (${section.startMeasure})`;
+            bounds = `(${section.startMeasure})`;
         }
 
-        lines.push(`${hashes} ${section.title}${bounds}`);
+        const titlePart = [section.title, bounds].filter(Boolean).join(' ');
+        lines.push(`${tabs}${titlePart}`);
 
         // Inject Optional Attributes
         if (section.timeSignature) {
-            lines.push(`Time: ${section.timeSignature}`);
+            lines.push(`${tabs}Time: ${section.timeSignature}`);
         }
         if (section.tempo) {
-            lines.push(`Tempo: ${section.tempo}`);
+            lines.push(`${tabs}Tempo: ${section.tempo}`);
         }
         if (section.text) {
             // Re-escape actual newlines into literal \n string sequences for the Markdown format
             const escapedText = section.text.replace(/\n/g, '\\n');
-            lines.push(`Text: ${escapedText}`);
+            lines.push(`${tabs}Text: ${escapedText}`);
         }
 
         // Recursively serialize children

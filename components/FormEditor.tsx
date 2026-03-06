@@ -406,8 +406,8 @@ export function FormEditor() {
             id: uuidv4(),
             title: '',
             editorLabel: `Subsection ${siblingCount + 1}`,
-            startMeasure: parentItem.startMeasure, // Default to parent's start
-            endMeasure: parentItem.endMeasure,     // Default to parent's end
+            startMeasure: 0,
+            endMeasure: 0,
             subSections: [],
             annotations: [],
             depth: parentItem.depth + 1
@@ -443,23 +443,23 @@ export function FormEditor() {
             }
         }
 
-        const newId = uuidv4();
-        const newSection: FlattenedItem = {
-            id: newId,
-            title: '',
-            editorLabel: referenceItem.depth === 0 ? `Section ${siblingCount + 1}` : `Subsection ${siblingCount + 1}`,
-            startMeasure: referenceItem.endMeasure,
-            endMeasure: referenceItem.endMeasure,
-            subSections: [],
-            annotations: [],
-            depth: referenceItem.depth
-        };
-
         let insertIndex = index;
         for (let i = index + 1; i < flattenedItems.length; i++) {
             if (flattenedItems[i].depth <= referenceItem.depth) break;
             insertIndex = i;
         }
+
+        const newId = uuidv4();
+        const newSection: FlattenedItem = {
+            id: newId,
+            title: '',
+            editorLabel: referenceItem.depth === 0 ? `Section ${siblingCount + 1}` : `Subsection ${siblingCount + 1}`,
+            startMeasure: 0,
+            endMeasure: 0,
+            subSections: [],
+            annotations: [],
+            depth: referenceItem.depth
+        };
 
         const newItems = [...flattenedItems];
         newItems.splice(insertIndex + 1, 0, newSection);

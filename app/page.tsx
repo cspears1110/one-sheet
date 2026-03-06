@@ -17,15 +17,6 @@ export default function Home() {
     setHydrated(true);
   }, []);
 
-  // Handle Theme changes
-  useEffect(() => {
-    if (storeState.theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [storeState.theme]);
-
   if (!hydrated) return null; // Avoid server/client mismatch rendering empty canvas
 
   return (

@@ -11,8 +11,6 @@ export interface AppState {
     updateCompositionAndSync: (updater: Composition | ((prev: Composition) => Composition)) => void;
     pageConfig: PageConfig;
     setPageConfig: (config: Partial<PageConfig>) => void;
-    theme: 'light' | 'dark';
-    setTheme: (theme: 'light' | 'dark') => void;
     collapsedIds: string[];
     toggleCollapsedId: (id: string) => void;
 }
@@ -47,8 +45,6 @@ export const useStore = create<AppState>()(
             setPageConfig: (config) => set((state) => ({
                 pageConfig: { ...state.pageConfig, ...config }
             })),
-            theme: 'light',
-            setTheme: (theme) => set({ theme }),
             collapsedIds: [],
             toggleCollapsedId: (id) => set((state) => {
                 const isCollapsed = state.collapsedIds.includes(id);

@@ -3,13 +3,21 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '../lib/store';
 import { parseCompositionText } from '../lib/parser';
+import { oneSheetSyntax, oneSheetFolding } from '../lib/syntax';
+import { oneSheetLightTheme, oneSheetDarkTheme } from '../lib/theme';
+import { useTheme } from 'next-themes';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FormEditor } from './FormEditor';
 import { SettingsEditor } from './SettingsEditor';
+import CodeMirror from '@uiw/react-codemirror';
 
 export function TextEditor() {
     const { rawText, setRawText, composition, updateCompositionAndSync, setComposition } = useStore();
     const [localText, setLocalText] = useState(rawText);
+    const { theme, systemTheme } = useTheme();
+
+    const currentTheme = theme === "system" ? systemTheme : theme;
+    const cmTheme = currentTheme === "dark" ? oneSheetDarkTheme : oneSheetLightTheme;
 
     // Debounce the parsing to avoid thrashing the tree state on every keystroke
     useEffect(() => {
@@ -68,20 +76,32 @@ export function TextEditor() {
                 <TabsContent value="editor" className="flex-1 flex flex-col m-0 p-4 data-[state=active]:flex overflow-y-auto">
                     <div className="text-sm text-muted-foreground mb-4 space-y-1 shrink-0">
                         <p>Use `Title:`, `Subtitle:`, `Composer:`, and `Created By:` for metadata.</p>
-                        <p>Use Markdown headers (`#`, `##`, `###`) for nested sections.</p>
-                        <p>Append `(start-end)` for measure ranges, e.g. `## Theme A (1-8)`. Add `*` to instead display total count `(1-8*)`.</p>
-                        <p>Use `Tempo:` for markings, e.g. `Tempo: Fast [q] = 160`.</p>
+                        <p>Type section names normally, and hit `Tab` to indent for sub-sections.</p>
+                        <p>Append `(start-end)` for measure ranges, e.g. `Theme A (1-8)`. Add `*` to instead display total count `(1-8*)`.</p>
                         <p>Use `Time:` for meter, e.g. `Time: 4/4` or `Time: Cut`.</p>
-                        <p>Use `Text:` below a section to add inline descriptions. Use `\n` for line breaks.</p>
+                        <p>Use `Text:` to add inline descriptions. Use `\n` for line breaks.</p>
+                        <p>Use `Tempo:` for markings, e.g. `Tempo: Fast [q] = 160`.</p>
                         <p className="text-xs italic opacity-80">Supported notes: [w], [h], [q], [e], [s] (add '.' for dotted).</p>
                     </div>
 
-                    <textarea
-                        className="flex-1 w-full bg-background border border-input rounded p-4 font-mono text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none shadow-inner"
-                        value={localText}
-                        onChange={(e) => setLocalText(e.target.value)}
-                        placeholder={`Title: My Piece\nSubtitle: Movement 1\nComposer: Me\nCreated By: John Doe\n\n# Intro (1-8)\nTime: 4/4\n## Theme A (1-4)`}
-                    />
+                    <div className="flex-1 w-full h-full border border-input rounded overflow-hidden shadow-inner focus-within:ring-2 focus-within:ring-ring">
+                        <CodeMirror
+                            className="h-full text-sm"
+                            value={localText}
+                            height="100%"
+                            indentWithTab={true}
+                            onChange={(value) => setLocalText(value)}
+                            theme={cmTheme}
+                            extensions={[oneSheetSyntax, oneSheetFolding]}
+                            placeholder={`Title: My Piece\nSubtitle: Movement 1\nComposer: Me\nCreated By: John Doe\n\nIntro (1-8)\nTime: 4/4\n\tTheme A (1-4)\n\t\tPhrase 1 (1-2)\n\t\tPhrase 2 (3-4)`}
+                            basicSetup={{
+                                lineNumbers: false,
+                                foldGutter: true,
+                                highlightActiveLine: false,
+                                tabSize: 4,
+                            }}
+                        />
+                    </div>
                 </TabsContent>
 
                 {/* Form UI View */}

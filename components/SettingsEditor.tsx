@@ -3,9 +3,11 @@ import { useStore } from '../lib/store';
 import { PageSize, PageOrientation } from '../lib/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useTheme } from 'next-themes';
 
 export function SettingsEditor() {
-    const { pageConfig, setPageConfig, theme, setTheme } = useStore();
+    const { pageConfig, setPageConfig } = useStore();
+    const { theme, setTheme } = useTheme();
 
     return (
         <div className="flex flex-col space-y-6">
