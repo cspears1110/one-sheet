@@ -16,7 +16,7 @@ export const oneSheetSyntax = StreamLanguage.define<{ isStartOfLine: boolean }>(
 
         if (state.isStartOfLine) {
             // Match metadata titles at start of line
-            if (stream.match(/^(Title|Subtitle|Composer|Created By|Arranger|Transcriber|Tempo|Time|Text):/i)) {
+            if (stream.match(/^(Title|Subtitle|Composer|Created By|Arranger|Transcriber|Tempo|Time|Text|Style):/i)) {
                 state.isStartOfLine = false;
                 return "keyword";
             }
@@ -56,7 +56,7 @@ export const oneSheetFolding = foldService.of((state, lineStart, lineEnd) => {
     if (!lineText.trim()) return null;
 
     // Do not start a fold on metadata lines themselves
-    if (/^[ \t]*(Title|Subtitle|Composer|Created By|Arranger|Transcriber|Tempo|Time|Text):/i.test(lineText)) {
+    if (/^[ \t]*(Title|Subtitle|Composer|Created By|Arranger|Transcriber|Tempo|Time|Text|Style):/i.test(lineText)) {
         return null;
     }
 
@@ -90,7 +90,7 @@ export const oneSheetFolding = foldService.of((state, lineStart, lineEnd) => {
             endLine = i;
         } else if (nextIndent === myIndent) {
             // Same indentation. If it's metadata, it belongs to this section.
-            if (/^[ \t]*(Tempo|Time|Text):/i.test(nextText)) {
+            if (/^[ \t]*(Tempo|Time|Text|Style):/i.test(nextText)) {
                 endLine = i;
             } else {
                 // Sibling section, stop here

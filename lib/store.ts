@@ -3,6 +3,14 @@ import { persist } from 'zustand/middleware';
 import { Composition, PageConfig, Section } from './types';
 import { serializeComposition } from './serializer';
 
+export type ActiveSelectionType = 'none' | 'startMeasure' | 'measureRange' | 'timeSignature' | 'brace' | 'title' | 'text' | 'tempo';
+
+export interface ActiveSelection {
+    sectionId: string | null;
+    type: ActiveSelectionType;
+    rect?: DOMRect;
+}
+
 export interface AppState {
     rawText: string;
     setRawText: (text: string) => void;
@@ -13,6 +21,8 @@ export interface AppState {
     setPageConfig: (config: Partial<PageConfig>) => void;
     collapsedIds: string[];
     toggleCollapsedId: (id: string) => void;
+    activeSelection: ActiveSelection;
+    setActiveSelection: (selection: ActiveSelection) => void;
 }
 
 export const useStore = create<AppState>()(
@@ -53,7 +63,9 @@ export const useStore = create<AppState>()(
                         ? state.collapsedIds.filter(cid => cid !== id)
                         : [...state.collapsedIds, id]
                 };
-            })
+            }),
+            activeSelection: { sectionId: null, type: 'none' },
+            setActiveSelection: (selection) => set({ activeSelection: selection }),
         }),
         {
             name: 'one-sheet-storage',

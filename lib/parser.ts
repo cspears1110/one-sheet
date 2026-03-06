@@ -71,6 +71,60 @@ export function parseCompositionText(text: string): ParsedComposition {
             continue;
         }
 
+        // Style parsing (e.g. "Style: MeasureShape=circle, BraceColor=red")
+        const styleMatch = line.match(/^[ \t]*Style:\s*(.*)$/i);
+        if (styleMatch) {
+            const styleStr = styleMatch[1].trim();
+            const styleProps = styleStr.split(',').map(s => s.trim());
+            const parsedStyle: any = {};
+
+            for (const prop of styleProps) {
+                const [key, value] = prop.split('=').map(s => s.trim());
+                if (!key || !value) continue;
+
+                // Map string keys to SectionStyle properties
+                const lowerKey = key.toLowerCase();
+                // Start Measure
+                if (lowerKey === 'startmeasureshape') parsedStyle.startMeasureShape = value;
+                else if (lowerKey === 'startmeasuretextmodifiers') parsedStyle.startMeasureTextModifiers = value.split(' ');
+                else if (lowerKey === 'hidestartmeasure') parsedStyle.hideStartMeasure = value === 'true';
+                else if (lowerKey === 'startmeasuretextoverride') parsedStyle.startMeasureTextOverride = value;
+                else if (lowerKey === 'startmeasurecolor') parsedStyle.startMeasureColor = value;
+                // Measure Range
+                else if (lowerKey === 'measurerangetextmodifiers') parsedStyle.measureRangeTextModifiers = value.split(' ');
+                else if (lowerKey === 'hidemeasurerange') parsedStyle.hideMeasureRange = value === 'true';
+                else if (lowerKey === 'measurerangetextoverride') parsedStyle.measureRangeTextOverride = value;
+                else if (lowerKey === 'measurerangecolor') parsedStyle.measureRangeColor = value;
+                // Brace
+                else if (lowerKey === 'braceshape') parsedStyle.braceShape = value;
+                else if (lowerKey === 'bracecolor') parsedStyle.braceColor = value;
+                else if (lowerKey === 'bracedashed') parsedStyle.braceDashed = value === 'true';
+                else if (lowerKey === 'hidebrace') parsedStyle.hideBrace = value === 'true';
+                // Title
+                else if (lowerKey === 'titlemodifiers') parsedStyle.titleModifiers = value.split(' ');
+                else if (lowerKey === 'hidetitle') parsedStyle.hideTitle = value === 'true';
+                else if (lowerKey === 'titlecolor') parsedStyle.titleColor = value;
+                // Text
+                else if (lowerKey === 'textmodifiers') parsedStyle.textModifiers = value.split(' ');
+                else if (lowerKey === 'hidetext') parsedStyle.hideText = value === 'true';
+                else if (lowerKey === 'textcolor') parsedStyle.textColor = value;
+                // Tempo
+                else if (lowerKey === 'tempomodifiers') parsedStyle.tempoModifiers = value.split(' ');
+                else if (lowerKey === 'tempotextoverride') parsedStyle.tempoTextOverride = value;
+                else if (lowerKey === 'tempocolor') parsedStyle.tempoColor = value;
+                else if (lowerKey === 'hidetempo') parsedStyle.hideTempo = value === 'true';
+            }
+
+            if (Object.keys(parsedStyle).length > 0) {
+                if (stack.length > 0) {
+                    stack[stack.length - 1].section.style = parsedStyle;
+                } else if (sections.length > 0) {
+                    sections[sections.length - 1].style = parsedStyle;
+                }
+            }
+            continue;
+        }
+
         if (line.trim() === '') continue;
 
         const match = line.match(/^([ \t]*)(.*?)(?:[ \t]*\((\d+)\s*-\s*(\d+)(\*?)\))?\s*$/);

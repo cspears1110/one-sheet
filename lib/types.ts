@@ -6,6 +6,43 @@ export interface Annotation {
   offset: { x: number; y: number };
 }
 
+export interface SectionStyle {
+  // Start Measure
+  startMeasureShape?: 'square' | 'circle' | 'none';
+  startMeasureTextModifiers?: ('bold' | 'italic' | 'underline')[];
+  startMeasureTextOverride?: string;
+  startMeasureColor?: string;
+  hideStartMeasure?: boolean;
+
+  // Measure Range
+  measureRangeTextModifiers?: ('bold' | 'italic' | 'underline')[];
+  measureRangeTextOverride?: string;
+  measureRangeColor?: string;
+  hideMeasureRange?: boolean;
+
+  // Brace
+  braceShape?: 'brace' | 'bracket' | 'line' | 'none';
+  braceColor?: string;
+  braceDashed?: boolean;
+  hideBrace?: boolean;
+
+  // Title
+  titleModifiers?: ('bold' | 'italic' | 'underline')[];
+  titleColor?: string;
+  hideTitle?: boolean;
+
+  // Text
+  textModifiers?: ('bold' | 'italic' | 'underline')[];
+  textColor?: string;
+  hideText?: boolean;
+
+  // Tempo
+  tempoModifiers?: ('bold' | 'italic' | 'underline')[];
+  tempoTextOverride?: string;
+  tempoColor?: string;
+  hideTempo?: boolean;
+}
+
 export interface Section {
   id: string;
   title: string;
@@ -18,6 +55,7 @@ export interface Section {
   timeSignature?: string;
   text?: string;
   showMeasureCount?: boolean;
+  style?: SectionStyle;
 }
 
 export interface Composition {

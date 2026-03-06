@@ -80,6 +80,7 @@ export function TextEditor() {
                         <p>Append `(start-end)` for measure ranges, e.g. `Theme A (1-8)`. Add `*` to instead display total count `(1-8*)`.</p>
                         <p>Use `Time:` for meter, e.g. `Time: 4/4` or `Time: Cut`.</p>
                         <p>Use `Text:` to add inline descriptions. Use `\n` for line breaks.</p>
+                        <p>Use `Style:` to customize node visuals (via popover). e.g. `Style: BraceColor=red`.</p>
                         <p>Use `Tempo:` for markings, e.g. `Tempo: Fast [q] = 160`.</p>
                         <p className="text-xs italic opacity-80">Supported notes: [w], [h], [q], [e], [s] (add '.' for dotted).</p>
                     </div>
