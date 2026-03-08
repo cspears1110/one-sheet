@@ -141,8 +141,8 @@ export function CanvasPopover() {
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="none">None</SelectItem>
-                                    <SelectItem value="circle">Circle</SelectItem>
                                     <SelectItem value="square">Square</SelectItem>
+                                    <SelectItem value="circle">Circle</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -153,7 +153,7 @@ export function CanvasPopover() {
                                 type="multiple"
                                 size="sm"
                                 className="justify-start border p-1 rounded-md"
-                                value={currentStyle.startMeasureTextModifiers || []}
+                                value={currentStyle.startMeasureTextModifiers || ['bold']}
                                 onValueChange={(val) => updateStyle({ startMeasureTextModifiers: val as ('bold' | 'italic' | 'underline')[] })}
                             >
                                 <ToggleGroupItem value="bold" aria-label="Toggle bold" className="h-6 w-8 px-0">

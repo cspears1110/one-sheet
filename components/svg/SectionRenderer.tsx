@@ -222,6 +222,16 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
 
     return (
         <g transform={`translate(${x}, ${y})`}>
+            {/* Brace/Bracket Interactive Group */}
+            <g
+                className={`cursor-pointer group ${hideBrace ? 'print:hidden' : ''}`}
+                onClick={(e) => handleClick(e, 'brace')}
+            >
+                {/* Invisible hit target for the brace line */}
+                <rect x={-4} y={-braceHeight - 4} width={width + 8} height={braceHeight * 2 + 8} fill="transparent" />
+                {renderResolvedBrace()}
+            </g>
+
             {/* Tempo Marking Interactive Group */}
             {section.tempo && (
                 <g
@@ -253,10 +263,10 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                     <rect x={-4} y={isCurlyBrace ? -26 : -14} width={24} height={14} fill="transparent" />
 
                     {currentStyle.startMeasureShape === 'circle' && (
-                        <circle cx={10} cy={isCurlyBrace ? -20 : -8} r={12} fill="white" stroke={isSelected('startMeasure') ? '#2563eb' : (hideStartMeasure ? '#d1d5db' : startMeasureColor)} strokeWidth={currentStyle.startMeasureTextModifiers?.includes('bold') ? 1.5 : 1} />
+                        <circle cx={10} cy={isCurlyBrace ? -20 : -8} r={12} fill="white" stroke={isSelected('startMeasure') ? '#2563eb' : (hideStartMeasure ? '#d1d5db' : startMeasureColor)} strokeWidth={(currentStyle.startMeasureTextModifiers || ['bold']).includes('bold') ? 1.5 : 1} />
                     )}
                     {currentStyle.startMeasureShape === 'square' && (
-                        <rect x={-2} y={isCurlyBrace ? -32 : -20} width={24} height={24} fill="white" stroke={isSelected('startMeasure') ? '#2563eb' : (hideStartMeasure ? '#d1d5db' : startMeasureColor)} strokeWidth={currentStyle.startMeasureTextModifiers?.includes('bold') ? 1.5 : 1} />
+                        <rect x={-2} y={isCurlyBrace ? -32 : -20} width={24} height={24} fill="white" stroke={isSelected('startMeasure') ? '#2563eb' : (hideStartMeasure ? '#d1d5db' : startMeasureColor)} strokeWidth={(currentStyle.startMeasureTextModifiers || ['bold']).includes('bold') ? 1.5 : 1} />
                     )}
 
                     <text
@@ -266,8 +276,8 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                         fontSize={12}
                         fontFamily="sans-serif"
                         textAnchor="middle"
-                        {...getFontStyle(currentStyle.startMeasureTextModifiers)}
-                        style={getFontStyle(currentStyle.startMeasureTextModifiers)}
+                        {...getFontStyle(currentStyle.startMeasureTextModifiers || ['bold'])}
+                        style={getFontStyle(currentStyle.startMeasureTextModifiers || ['bold'])}
                     >
                         {currentStyle.startMeasureTextOverride || positioned.startMeasure}
                     </text>
@@ -299,16 +309,6 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                     </g>
                 );
             })()}
-
-            {/* Brace/Bracket Interactive Group */}
-            <g
-                className={`cursor-pointer group ${hideBrace ? 'print:hidden' : ''}`}
-                onClick={(e) => handleClick(e, 'brace')}
-            >
-                {/* Invisible hit target for the brace line */}
-                <rect x={-4} y={-braceHeight - 4} width={width + 8} height={braceHeight * 2 + 8} fill="transparent" />
-                {renderResolvedBrace()}
-            </g>
 
             {/* Vertical Section Divider (solid black line per reference image) */}
             <line x1={0} y1={braceHeight} x2={0} y2={positioned.subtreeHeight} stroke={color} strokeWidth={1} />
