@@ -59,6 +59,23 @@ export function CanvasRenderer() {
         return { layoutStaves: bestStaves, scale: bestScale, logicalConfig: bestConfig };
     }, [composition, currentConfig]);
 
+    // Format strict sizes for Safari print bug (@page ignores size: letter landscape)
+    const { printWidth, printHeight, printSizeStr } = useMemo(() => {
+        const dimensions = {
+            letter: { w: 8.5, h: 11 },
+            legal: { w: 8.5, h: 14 },
+            tabloid: { w: 11, h: 17 }
+        };
+        const dim = dimensions[pageConfig.size];
+        let w = `${dim.w}in`;
+        let h = `${dim.h}in`;
+        if (pageConfig.orientation === 'landscape') {
+            w = `${dim.h}in`;
+            h = `${dim.w}in`;
+        }
+        return { printWidth: w, printHeight: h, printSizeStr: `${w} ${h}` };
+    }, [pageConfig.size, pageConfig.orientation]);
+
     // The physical page boundaries are strict now.
     const heightLimit = currentConfig.maxHeight + 80;
     const widthLimit = currentConfig.maxWidth + 80;
@@ -68,26 +85,39 @@ export function CanvasRenderer() {
     const offsetX = 40 + ((currentConfig.maxWidth - scaledWidth) / 2);
 
     return (
-        <div className="w-full h-full overflow-hidden bg-background p-8 flex items-center justify-center print:block print:p-0 print:bg-white">
+        <div className="w-full h-full overflow-hidden bg-background p-8 flex items-center justify-center print:block print:p-0 print:bg-white print-strict-container">
             <style type="text/css">
                 {`
                     @media print {
                         @page {
-                            size: ${pageConfig.size} ${pageConfig.orientation};
+                            size: ${printSizeStr};
                             margin: 0;
+                        }
+                        .print-strict-container {
+                            width: ${printWidth} !important;
+                            height: ${printHeight} !important;
+                            max-width: 100% !important;
+                            max-height: 100% !important;
+                        }
+                        .print-exact-size {
+                            width: 100% !important;
+                            height: 100% !important;
+                            max-width: 100% !important;
+                            max-height: 100% !important;
+                            page-break-inside: avoid;
+                            page-break-after: avoid;
                         }
                     }
                 `}
             </style>
             <svg
                 viewBox={`0 0 ${widthLimit} ${heightLimit}`}
-                className="bg-white shadow-xl ring-1 ring-zinc-900/5 print:shadow-none print:ring-0 print:w-screen print:h-screen print:max-w-none print:max-h-none print:m-0"
+                className="bg-white shadow-xl ring-1 ring-zinc-900/5 print:shadow-none print:ring-0 print:m-0 print-exact-size"
                 style={{
                     maxWidth: '100%',
                     maxHeight: '100%',
+                    height: '100%',
                     aspectRatio: `${widthLimit} / ${heightLimit}`,
-                    width: 'auto',
-                    height: 'auto'
                 }}
                 onClick={() => setActiveSelection({ sectionId: null, type: 'none' })}
             >
@@ -135,6 +165,6 @@ export function CanvasRenderer() {
 
             {/* Popover overlay rendered in typical DOM layer */}
             <CanvasPopover />
-        </div>
+        </div >
     );
 }

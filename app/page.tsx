@@ -20,11 +20,11 @@ export default function Home() {
   if (!hydrated) return null; // Avoid server/client mismatch rendering empty canvas
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
+    <div id="app-root" className="flex h-screen w-screen overflow-hidden bg-background text-foreground print:block print:h-full print:w-full print:overflow-visible">
       <div className="w-1/3 min-w-[300px] flex flex-col print:hidden">
         <TextEditor />
       </div>
-      <div className="flex-1 overflow-auto flex items-center justify-center relative">
+      <div className="flex-1 overflow-auto flex items-center justify-center relative print:block print:overflow-visible">
         <CanvasRenderer />
         <div className="absolute bottom-8 right-8 print:hidden">
           <Button

@@ -52,21 +52,9 @@
     background-color: white !important;
   }
 
-  body * {
-    visibility: hidden;
-  }
-
-  .flex-1>div,
-  .flex-1>div * {
-    visibility: visible;
-  }
-
-  .flex-1>div {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100vw;
-    background: transparent !important;
+  /* Aggressively hide all injected Next.js dev tools/portals */
+  body>*:not(#app-root):not(script):not(style) {
+    display: none !important;
   }
 
   /* Hide the print button itself */
