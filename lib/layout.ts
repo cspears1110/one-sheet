@@ -8,6 +8,7 @@ export interface PositionedSection {
     height: number; // Length of the vertical drop down line
     subtreeHeight: number; // Total height of this section and all children
     startMeasure: number; // For rendering
+    inferredEndMeasure?: number; // Calculated dynamic end based on next sibling
     children: PositionedSection[];
 }
 
@@ -111,18 +112,21 @@ export function wrapText(text: string, maxPixelWidth: number, approxCharWidth = 
 }
 
 // Helper to determine the minimum dimensions required for a section subtree
-function calculateMinDimensions(section: Section, config: LayoutConfig): { width: number; depth: number } {
-    const startMeasureStrWidth = section.startMeasure.toString().length * 7; // Approx 7px per char at fontSize 12
-    const rangeStrWidth = section.showMeasureCount ?
-        ((section.endMeasure - section.startMeasure + 1).toString().length * 7) :
-        (`${section.startMeasure}-${section.endMeasure}`.length * 7);
+function calculateMinDimensions(section: Section, config: LayoutConfig, inferredEnd?: number): { width: number; depth: number } {
+    const hasShape = section.style?.startMeasureShape === 'circle' || section.style?.startMeasureShape === 'square';
+    const startMeasureFootprint = hasShape ? 30 : (section.startMeasure.toString().length * 7); // Approx 7px per char without shape, 30px with shape
 
-    // To prevent overlap: Left item ends at (4 + startMeasureStrWidth + padding).
+    const endM = section.endMeasure ?? inferredEnd ?? section.startMeasure;
+    const rangeStrWidth = section.showMeasureCount ?
+        ((endM - section.startMeasure + 1).toString().length * 7) :
+        (`${section.startMeasure}-${endM}`.length * 7);
+
+    // To prevent overlap: Left item ends at (4 + startMeasureFootprint + padding).
     // Center item begins at (width / 2 - rangeStrWidth / 2).
-    // So: width / 2 >= 4 + startMeasureStrWidth + padding + rangeStrWidth / 2
-    // width >= 2 * (4 + startMeasureStrWidth + padding) + rangeStrWidth
-    const padding = 4;
-    const minMeasureTextWidth = 2 * (4 + startMeasureStrWidth + padding) + rangeStrWidth;
+    // So: width / 2 >= 4 + startMeasureFootprint + padding + rangeStrWidth / 2
+    // width >= 2 * (4 + startMeasureFootprint + padding) + rangeStrWidth
+    const padding = 8;
+    const minMeasureTextWidth = 2 * (4 + startMeasureFootprint + padding) + rangeStrWidth;
 
     // Ensure there's a minimum baseline width so tiny titles or measure counts don't get squished.
     const titleText = section.title || '';
@@ -153,8 +157,17 @@ function calculateMinDimensions(section: Section, config: LayoutConfig): { width
     let totalWidth = 0;
     let maxChildDepth = 0;
 
-    for (const child of section.subSections) {
-        const { width, depth } = calculateMinDimensions(child, config);
+    for (let i = 0; i < section.subSections.length; i++) {
+        const child = section.subSections[i];
+        let childInferredEnd: number | undefined;
+        if (child.endMeasure === undefined) {
+            if (i < section.subSections.length - 1) {
+                childInferredEnd = Math.max(child.startMeasure, section.subSections[i + 1].startMeasure - 1);
+            } else {
+                childInferredEnd = endM; // Inherit parent's end boundary
+            }
+        }
+        const { width, depth } = calculateMinDimensions(child, config, childInferredEnd);
         totalWidth += width;
         if (depth > maxChildDepth) {
             maxChildDepth = depth;
@@ -173,7 +186,8 @@ function layoutSectionCoordinates(
     startX: number,
     startY: number,
     assignedWidth: number,
-    config: LayoutConfig
+    config: LayoutConfig,
+    inferredEndMeasure?: number
 ): PositionedSection {
     let textHeightOffset = 0;
     if (section.text) {
@@ -192,6 +206,7 @@ function layoutSectionCoordinates(
         height: baseHeight,
         subtreeHeight: baseHeight,
         startMeasure: section.startMeasure,
+        inferredEndMeasure,
         children: [],
     };
 
@@ -210,11 +225,21 @@ function layoutSectionCoordinates(
 
         let currentX = 0;
         section.subSections.forEach((child, i) => {
+            let childInferredEnd: number | undefined;
+            if (child.endMeasure === undefined) {
+                if (i < section.subSections.length - 1) {
+                    childInferredEnd = Math.max(child.startMeasure, section.subSections[i + 1].startMeasure - 1);
+                } else {
+                    const fallbackEnd = positioned.inferredEndMeasure ?? positioned.section.endMeasure ?? positioned.section.startMeasure;
+                    childInferredEnd = fallbackEnd; // Inherit parent's end boundary
+                }
+            }
+
             const childMinW = childrenDims[i];
             // Scale child width if parent was forcefully expanded, else use min width
             const childWidth = sumMins > 0 ? (childMinW / sumMins) * assignedWidth : assignedWidth / section.subSections.length;
 
-            const renderedChild = layoutSectionCoordinates(child, currentX, yOffsetForChildren, childWidth, config);
+            const renderedChild = layoutSectionCoordinates(child, currentX, yOffsetForChildren, childWidth, config, childInferredEnd);
             positioned.children.push(renderedChild);
 
             if (renderedChild.subtreeHeight > maxChildSubtreeHeight) {
@@ -277,8 +302,20 @@ export function computeLayout(composition: Composition, config: LayoutConfig): S
         currentStaffX = 0;
     };
 
-    for (const topSection of composition.sections) {
-        const { width: minWidth, depth } = calculateMinDimensions(topSection, config);
+    for (let i = 0; i < composition.sections.length; i++) {
+        const topSection = composition.sections[i];
+
+        let inferredEnd: number | undefined;
+        if (topSection.endMeasure === undefined) {
+            if (i < composition.sections.length - 1) {
+                inferredEnd = Math.max(topSection.startMeasure, composition.sections[i + 1].startMeasure - 1);
+            } else {
+                // If it's the very last section globally, do not infer a length
+                inferredEnd = undefined;
+            }
+        }
+
+        const { width: minWidth, depth } = calculateMinDimensions(topSection, config, inferredEnd);
 
         // Check if we need to wrap
         // If a single section is larger than maxWidth, it gets its own staff anyway
@@ -287,7 +324,7 @@ export function computeLayout(composition: Composition, config: LayoutConfig): S
         }
 
         // Now currentStaffX is 0 if we just wrapped
-        const renderedSection = layoutSectionCoordinates(topSection, currentStaffX, 0, minWidth, config);
+        const renderedSection = layoutSectionCoordinates(topSection, currentStaffX, 0, minWidth, config, inferredEnd);
         currentStaffSections.push(renderedSection);
         currentStaffX += minWidth;
     }

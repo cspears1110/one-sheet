@@ -28,7 +28,7 @@ export interface AppState {
 export const useStore = create<AppState>()(
     persist(
         (set) => ({
-            rawText: '(1-8)\nTime: 4/4\n',
+            rawText: '(1)\nTime: 4/4\n',
             setRawText: (text) => set({ rawText: text }),
             composition: {
                 id: 'default',
@@ -43,7 +43,7 @@ export const useStore = create<AppState>()(
                         title: '',
                         editorLabel: '',
                         startMeasure: 1,
-                        endMeasure: 8,
+                        endMeasure: undefined,
                         showMeasureCount: false,
                         timeSignature: '4/4',
                         subSections: [],

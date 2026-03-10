@@ -127,7 +127,7 @@ export function parseCompositionText(text: string): ParsedComposition {
 
         if (line.trim() === '') continue;
 
-        const match = line.match(/^([ \t]*)(.*?)(?:[ \t]*\((\d+)\s*-\s*(\d+)(\*?)\))?\s*$/);
+        const match = line.match(/^([ \t]*)(.*?)(?:[ \t]*\((\d+)(?:\s*-\s*(\d+))?(\*?)\))?\s*$/);
         if (!match) continue; // Skip unparseable lines
 
         const indentStr = match[1];
@@ -141,7 +141,7 @@ export function parseCompositionText(text: string): ParsedComposition {
         const level = 1 + tabs + Math.floor(spaces / 2);
         let sectionTitle = match[2] ? match[2].trim() : '';
         let startMeasure = match[3] ? parseInt(match[3], 10) : 0;
-        let endMeasure = match[4] ? parseInt(match[4], 10) : -1;
+        let endMeasure = match[4] ? parseInt(match[4], 10) : undefined;
         let showMeasureCount = match[5] === '*';
 
         const newSection: Section = {

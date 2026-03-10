@@ -20,7 +20,7 @@ export function serializeComposition(composition: Composition): string {
         const tabs = '\t'.repeat(level - 1);
 
         let bounds = '';
-        if (section.endMeasure >= section.startMeasure) {
+        if (section.endMeasure !== undefined && section.endMeasure >= section.startMeasure) {
             bounds = `(${section.startMeasure}-${section.endMeasure}${section.showMeasureCount ? '*' : ''})`;
         } else if (section.startMeasure > 0) {
             bounds = `(${section.startMeasure})`;

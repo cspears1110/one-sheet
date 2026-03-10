@@ -5,9 +5,10 @@ import { useStore } from '../lib/store';
 import { computeLayout, getLayoutConfig } from '../lib/layout';
 import { SectionRenderer } from './svg/SectionRenderer';
 import { HeaderRenderer } from './svg/HeaderRenderer';
+import { CanvasPopover } from './CanvasPopover';
 
 export function CanvasRenderer() {
-    const { composition, pageConfig } = useStore();
+    const { composition, pageConfig, setActiveSelection } = useStore();
 
     const currentConfig = useMemo(() => getLayoutConfig(pageConfig), [pageConfig]);
 
@@ -88,6 +89,7 @@ export function CanvasRenderer() {
                     width: 'auto',
                     height: 'auto'
                 }}
+                onClick={() => setActiveSelection({ sectionId: null, type: 'none' })}
             >
                 {/* Unscaled exact physical layout for Document Header */}
                 <g transform="translate(40, 40)">
@@ -120,6 +122,9 @@ export function CanvasRenderer() {
                     </text>
                 )}
             </svg>
+
+            {/* Popover overlay rendered in typical DOM layer */}
+            <CanvasPopover />
         </div>
     );
 }

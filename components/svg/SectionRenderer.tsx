@@ -133,18 +133,21 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
     };
 
     // Calculate relative length for display and validation
-    const measureCount = (section.endMeasure >= section.startMeasure) ? (section.endMeasure - section.startMeasure + 1) : 0;
+    const endM = section.endMeasure ?? positioned.inferredEndMeasure ?? section.startMeasure;
+    const measureCount = (endM >= section.startMeasure) ? (endM - section.startMeasure + 1) : 0;
 
     // Simple conflict detection: does the continuous range of children match the parent?
     let isConflict = false;
-    if (section.subSections.length > 0 && measureCount > 0) {
-        const firstChildStart = section.subSections[0].startMeasure;
-        const lastChildEnd = section.subSections[section.subSections.length - 1].endMeasure;
-        const sumOfChildrenLengths = section.subSections.reduce((acc, sub) => {
-            return acc + ((sub.endMeasure >= sub.startMeasure) ? (sub.endMeasure - sub.startMeasure + 1) : 0);
+    if (positioned.children.length > 0 && measureCount > 0) {
+        const firstChildStart = positioned.children[0].startMeasure;
+        const lastChild = positioned.children[positioned.children.length - 1];
+        const lastChildEnd = lastChild.section.endMeasure ?? lastChild.inferredEndMeasure ?? lastChild.startMeasure;
+        const sumOfChildrenLengths = positioned.children.reduce((acc, child) => {
+            const subEndM = child.section.endMeasure ?? child.inferredEndMeasure ?? child.startMeasure;
+            return acc + ((subEndM >= child.startMeasure) ? (subEndM - child.startMeasure + 1) : 0);
         }, 0);
 
-        if (firstChildStart !== section.startMeasure || lastChildEnd !== section.endMeasure || sumOfChildrenLengths !== measureCount) {
+        if (firstChildStart !== section.startMeasure || lastChildEnd !== endM || sumOfChildrenLengths !== measureCount) {
             isConflict = true;
         }
     }
@@ -286,8 +289,7 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
 
             {/* Start and End Measure Range Interactive Group */}
             {measureCount > 0 && (() => {
-                const hasShape = currentStyle.startMeasureShape === 'circle' || currentStyle.startMeasureShape === 'square';
-                const measureRangeX = Math.max(width / 2, (!isFirstChild && hasShape) ? 46 : 24);
+                const measureRangeX = width / 2;
                 return (
                     <g
                         className={`cursor-pointer group ${hideMeasureRange ? 'print:hidden' : ''}`}
@@ -304,7 +306,7 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                             {...getFontStyle(currentStyle.measureRangeTextModifiers)}
                             style={getFontStyle(currentStyle.measureRangeTextModifiers)}
                         >
-                            {currentStyle.measureRangeTextOverride || (section.showMeasureCount ? measureCount.toString() : `${section.startMeasure}-${section.endMeasure}`)}
+                            {currentStyle.measureRangeTextOverride || (section.showMeasureCount ? measureCount.toString() : `${section.startMeasure}-${endM}`)}
                         </text>
                     </g>
                 );

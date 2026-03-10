@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { useStore } from '../lib/store';
 import { Section } from '../lib/types';
@@ -84,13 +84,30 @@ interface SectionCardProps {
     onPromote: () => void;
     onDemote: () => void;
     onAddSubsection: () => void;
+    isNewlyCreated: boolean;
+    onClearNewlyCreated: () => void;
 }
 
-function SectionCard({ item, depth, index, isCollapsed, hasChildren, isActive, onClick, onToggleCollapse, onChange, onDelete, onMoveUp, onMoveDown, onPromote, onDemote, onAddSubsection }: SectionCardProps) {
+function SectionCard({ item, depth, index, isCollapsed, hasChildren, isActive, onClick, onToggleCollapse, onChange, onDelete, onMoveUp, onMoveDown, onPromote, onDemote, onAddSubsection, isNewlyCreated, onClearNewlyCreated }: SectionCardProps) {
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [showTempo, setShowTempo] = useState(!!item.tempo);
     const [showTime, setShowTime] = useState(!!item.timeSignature);
     const [showText, setShowText] = useState(!!item.text);
+    const [showExplicitEnd, setShowExplicitEnd] = useState(item.endMeasure !== undefined);
+
+    const startMeasureRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (isActive && isNewlyCreated && startMeasureRef.current) {
+            // Slight delay ensures the collapse/expand animation has started
+            // and the input is fully accessible to the browser focus API.
+            const timer = setTimeout(() => {
+                startMeasureRef.current?.focus();
+                onClearNewlyCreated();
+            }, 50);
+            return () => clearTimeout(timer);
+        }
+    }, [isActive, isNewlyCreated, onClearNewlyCreated]);
 
     const style = {
         marginLeft: `${Math.max(0, depth) * indentationWidth}px`,
@@ -135,7 +152,7 @@ function SectionCard({ item, depth, index, isCollapsed, hasChildren, isActive, o
                                     </span>
                                 )}
                                 <span className="text-[10px] text-muted-foreground font-medium shrink-0">
-                                    {item.startMeasure}-{item.endMeasure}
+                                    {item.startMeasure}{item.endMeasure !== undefined ? `-${item.endMeasure}` : ''}
                                     {'showMeasureCount' in item && item.showMeasureCount ? '*' : ''}
                                 </span>
                             </div>
@@ -186,6 +203,12 @@ function SectionCard({ item, depth, index, isCollapsed, hasChildren, isActive, o
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-48">
+                                    <DropdownMenuCheckboxItem
+                                        checked={showExplicitEnd}
+                                        onCheckedChange={(c) => { setShowExplicitEnd(c); if (!c && item.endMeasure !== undefined) onChange('endMeasure', undefined); }}
+                                    >
+                                        Explicit End Measure
+                                    </DropdownMenuCheckboxItem>
                                     <DropdownMenuCheckboxItem
                                         checked={showTempo}
                                         onCheckedChange={(c) => { setShowTempo(c); if (!c && item.tempo) onChange('tempo', undefined); }}
@@ -243,21 +266,29 @@ function SectionCard({ item, depth, index, isCollapsed, hasChildren, isActive, o
                             <div className="flex-1">
                                 <label className="text-[10px] uppercase font-bold text-muted-foreground mb-0.5 block">Start Meas.</label>
                                 <Input
+                                    ref={startMeasureRef}
                                     type="number"
-                                    className="h-7 text-xs shadow-none border-dashed bg-muted/50 hover:bg-background focus:bg-background"
-                                    value={item.startMeasure ?? ''}
+                                    className="h-7 text-xs shadow-none border-dashed bg-muted/50 hover:bg-background focus:bg-background [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    value={item.startMeasure === 0 ? '' : item.startMeasure}
                                     onChange={e => onChange('startMeasure', parseInt(e.target.value, 10) || 0)}
+                                    placeholder="e.g. 1"
                                 />
                             </div>
-                            <div className="flex-1">
-                                <label className="text-[10px] uppercase font-bold text-muted-foreground mb-0.5 block">End Meas.</label>
-                                <Input
-                                    type="number"
-                                    className="h-7 text-xs shadow-none border-dashed bg-muted/50 hover:bg-background focus:bg-background"
-                                    value={item.endMeasure ?? ''}
-                                    onChange={e => onChange('endMeasure', parseInt(e.target.value, 10) || 0)}
-                                />
-                            </div>
+                            {showExplicitEnd && (
+                                <div className="flex-1 relative">
+                                    <label className="text-[10px] uppercase font-bold text-muted-foreground mb-0.5 block">End Meas.</label>
+                                    <Input
+                                        type="number"
+                                        className="h-7 text-xs shadow-none border-dashed bg-muted/50 hover:bg-background focus:bg-background [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                        value={item.endMeasure ?? ''}
+                                        onChange={e => {
+                                            const val = e.target.value;
+                                            onChange('endMeasure', val === '' ? undefined : parseInt(val, 10));
+                                        }}
+                                        placeholder="e.g. 8"
+                                    />
+                                </div>
+                            )}
                         </div>
 
                         {(showTempo || showTime) && (
@@ -308,6 +339,7 @@ function SectionCard({ item, depth, index, isCollapsed, hasChildren, isActive, o
 export function FormEditor() {
     const { composition, updateCompositionAndSync, collapsedIds, toggleCollapsedId } = useStore();
     const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
+    const [newSectionId, setNewSectionId] = useState<string | null>(null);
     const [deleteAlert, setDeleteAlert] = useState<{ isOpen: boolean; id: string | null; count: number }>({
         isOpen: false,
         id: null,
@@ -397,25 +429,45 @@ export function FormEditor() {
         const parentItem = flattenedItems[index];
 
         let siblingCount = 0;
+        let lastSibling: FlattenedItem | null = null;
         for (let i = index + 1; i < flattenedItems.length; i++) {
             if (flattenedItems[i].depth <= parentItem.depth) break;
-            if (flattenedItems[i].depth === parentItem.depth + 1) siblingCount++;
+            if (flattenedItems[i].depth === parentItem.depth + 1) {
+                siblingCount++;
+                lastSibling = flattenedItems[i];
+            }
         }
 
+        let defaultStartMeasure = parentItem.startMeasure;
+        if (lastSibling) {
+            defaultStartMeasure = lastSibling.endMeasure !== undefined ? lastSibling.endMeasure + 1 : lastSibling.startMeasure + 1;
+        }
+
+        const newId = uuidv4();
         const newSection: FlattenedItem = {
-            id: uuidv4(),
+            id: newId,
             title: '',
             editorLabel: `Subsection ${siblingCount + 1}`,
-            startMeasure: 0,
-            endMeasure: 0,
+            startMeasure: defaultStartMeasure,
+            endMeasure: undefined,
             subSections: [],
             annotations: [],
             depth: parentItem.depth + 1
         };
 
+        // Find the index of the last descendant to append the new section at the end of the parent.
+        let insertIndex = index;
+        for (let i = index + 1; i < flattenedItems.length; i++) {
+            if (flattenedItems[i].depth <= parentItem.depth) break;
+            insertIndex = i;
+        }
+
         const newItems = [...flattenedItems];
-        newItems.splice(index + 1, 0, newSection);
+        newItems.splice(insertIndex + 1, 0, newSection);
         updateCompositionAndSync(prev => ({ ...prev, sections: buildTreeFromFlatWithDepth(newItems) }));
+
+        setNewSectionId(newId);
+        setTimeout(() => setActiveSectionId(newId), 50);
     };
 
     const handleAddSiblingSection = (id: string) => {
@@ -455,7 +507,7 @@ export function FormEditor() {
             title: '',
             editorLabel: referenceItem.depth === 0 ? `Section ${siblingCount + 1}` : `Subsection ${siblingCount + 1}`,
             startMeasure: 0,
-            endMeasure: 0,
+            endMeasure: undefined,
             subSections: [],
             annotations: [],
             depth: referenceItem.depth
@@ -465,6 +517,7 @@ export function FormEditor() {
         newItems.splice(insertIndex + 1, 0, newSection);
         updateCompositionAndSync(prev => ({ ...prev, sections: buildTreeFromFlatWithDepth(newItems) }));
 
+        setNewSectionId(newId);
         setTimeout(() => setActiveSectionId(newId), 50);
     };
 
@@ -546,7 +599,7 @@ export function FormEditor() {
                 title: '',
                 editorLabel: `Section ${prev.sections.length + 1}`,
                 startMeasure: 0,
-                endMeasure: 0,
+                endMeasure: undefined,
                 subSections: [],
                 annotations: []
             };
@@ -557,6 +610,7 @@ export function FormEditor() {
         });
 
         // Auto-focus the newly created section
+        setNewSectionId(id);
         setTimeout(() => setActiveSectionId(id), 50);
     };
 
@@ -581,12 +635,19 @@ export function FormEditor() {
     // Global Keyboard Shortcut Listener
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            // Ignore if user is typing in an input or textarea
-            if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement).tagName)) {
+            const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement).tagName);
+
+            if (!activeSectionId) return;
+
+            // Always allow command/ctrl + enter to create a sibling section, even if inside an input
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                handleAddSiblingSection(activeSectionId);
                 return;
             }
 
-            if (!activeSectionId) return;
+            // Ignore other shortcuts if user is typing in an input or textarea
+            if (isInput) return;
 
             switch (e.key) {
                 case 'Backspace':
@@ -595,6 +656,7 @@ export function FormEditor() {
                     handleDelete(activeSectionId);
                     break;
                 case 'Enter':
+                    // Just in case, though caught above
                     if (e.metaKey || e.ctrlKey) {
                         e.preventDefault();
                         handleAddSiblingSection(activeSectionId);
@@ -704,6 +766,8 @@ export function FormEditor() {
                                 onPromote={() => handlePromote(item.id)}
                                 onDemote={() => handleDemote(item.id)}
                                 onAddSubsection={() => handleAddSubsection(item.id)}
+                                isNewlyCreated={newSectionId === item.id}
+                                onClearNewlyCreated={() => setNewSectionId(null)}
                             />
                         );
                     })}

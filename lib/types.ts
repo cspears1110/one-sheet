@@ -48,7 +48,7 @@ export interface Section {
   title: string;
   editorLabel?: string;
   startMeasure: number;
-  endMeasure: number;
+  endMeasure?: number;
   subSections: Section[]; // Recursive structure
   annotations: Annotation[];
   tempo?: string;
