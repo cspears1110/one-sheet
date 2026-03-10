@@ -469,6 +469,7 @@ export function FormEditor() {
     };
 
     const handleFieldChange = (id: string, field: keyof Section, value: any) => {
+        console.log("handleFieldChange", id, field, value);
         const targetIndex = flattenedItems.findIndex(i => i.id === id);
         if (targetIndex === -1) return;
 

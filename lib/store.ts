@@ -28,14 +28,28 @@ export interface AppState {
 export const useStore = create<AppState>()(
     persist(
         (set) => ({
-            rawText: 'Title: Symphony No. 5\nSubtitle: Fate Motive\nComposer: L.v. Beethoven\nCreated By: Transcribed by John Doe\n\n# Intro (1-8)\nTime: 4/4\nText: Grand opening.\\nSlowly crescendo to Theme A.\n## Theme A (1-4)\n## Theme B (5-8*)\nTime: Cut',
+            rawText: '(1-8)\nTime: 4/4\n',
             setRawText: (text) => set({ rawText: text }),
             composition: {
                 id: 'default',
                 title: 'Untitled Composition',
                 composer: '',
                 createdBy: '',
-                sections: []
+                arranger: '',
+                subtitle: '',
+                sections: [
+                    {
+                        id: 'section-1',
+                        title: '',
+                        editorLabel: '',
+                        startMeasure: 1,
+                        endMeasure: 8,
+                        showMeasureCount: false,
+                        timeSignature: '4/4',
+                        subSections: [],
+                        annotations: []
+                    }
+                ]
             },
             setComposition: (updater) => set((state) => ({
                 composition: typeof updater === 'function' ? updater(state.composition) : updater
