@@ -58,6 +58,33 @@ export interface Section {
   style?: SectionStyle;
 }
 
+export interface GlobalStyle {
+  // Global Title
+  titleModifiers?: ('bold' | 'italic' | 'underline')[];
+  titleColor?: string;
+  hideTitle?: boolean;
+
+  // Global Subtitle
+  subtitleModifiers?: ('bold' | 'italic' | 'underline')[];
+  subtitleColor?: string;
+  hideSubtitle?: boolean;
+
+  // Composer
+  composerModifiers?: ('bold' | 'italic' | 'underline')[];
+  composerColor?: string;
+  hideComposer?: boolean;
+
+  // Arranger
+  arrangerModifiers?: ('bold' | 'italic' | 'underline')[];
+  arrangerColor?: string;
+  hideArranger?: boolean;
+
+  // Created By
+  createdByModifiers?: ('bold' | 'italic' | 'underline')[];
+  createdByColor?: string;
+  hideCreatedBy?: boolean;
+}
+
 export interface Composition {
   id: string;
   title: string;
@@ -66,6 +93,7 @@ export interface Composition {
   arranger?: string;
   createdBy?: string;
   sections: Section[];
+  style?: GlobalStyle;
 }
 
 export type PageSize = 'letter' | 'legal' | 'tabloid';

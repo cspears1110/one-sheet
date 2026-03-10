@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import { Composition, PageConfig, Section } from './types';
 import { serializeComposition } from './serializer';
 
-export type ActiveSelectionType = 'none' | 'startMeasure' | 'measureRange' | 'timeSignature' | 'brace' | 'title' | 'text' | 'tempo';
+export type ActiveSelectionType = 'none' | 'startMeasure' | 'measureRange' | 'timeSignature' | 'brace' | 'title' | 'text' | 'tempo' | 'globalTitle' | 'globalSubtitle' | 'globalComposer' | 'globalArranger' | 'globalCreatedBy';
 
 export interface ActiveSelection {
     sectionId: string | null;

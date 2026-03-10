@@ -8,7 +8,7 @@ import { HeaderRenderer } from './svg/HeaderRenderer';
 import { CanvasPopover } from './CanvasPopover';
 
 export function CanvasRenderer() {
-    const { composition, pageConfig, setActiveSelection } = useStore();
+    const { composition, pageConfig, activeSelection, setActiveSelection } = useStore();
 
     const currentConfig = useMemo(() => getLayoutConfig(pageConfig), [pageConfig]);
 
@@ -109,17 +109,27 @@ export function CanvasRenderer() {
 
                 {/* Footer / Created By */}
                 {composition.createdBy && (
-                    <text
-                        x={widthLimit / 2}
-                        y={heightLimit - 40}
-                        textAnchor="middle"
-                        fontSize={10}
-                        fontStyle="italic"
-                        fontFamily="sans-serif"
-                        fill="gray"
+                    <g className={`composition-footer ${composition.style?.hideCreatedBy ? 'print:hidden' : ''}`} transform={`translate(0, ${heightLimit - 40})`}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveSelection({ sectionId: 'global', type: 'globalCreatedBy', rect: e.currentTarget.getBoundingClientRect() });
+                        }}
                     >
-                        OneSheet by {composition.createdBy}
-                    </text>
+                        <text
+                            x={widthLimit / 2}
+                            y={0}
+                            textAnchor="middle"
+                            fontSize={10}
+                            fontFamily="sans-serif"
+                            className="cursor-pointer"
+                            fill={(activeSelection.sectionId === 'global' && activeSelection.type === 'globalCreatedBy') ? '#3b82f6' : (composition.style?.hideCreatedBy ? '#d1d5db' : (composition.style?.createdByColor || 'gray'))}
+                            fontWeight={composition.style?.createdByModifiers?.includes('bold') ? 'bold' : 'normal'}
+                            fontStyle={composition.style?.createdByModifiers ? (composition.style.createdByModifiers.includes('italic') ? 'italic' : 'normal') : 'italic'}
+                            textDecoration={composition.style?.createdByModifiers?.includes('underline') ? 'underline' : 'none'}
+                        >
+                            OneSheet by {composition.createdBy}
+                        </text>
+                    </g>
                 )}
             </svg>
 

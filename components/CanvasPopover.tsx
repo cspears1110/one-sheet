@@ -6,7 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Bold, Italic, Underline, X } from 'lucide-react';
-import { Section, SectionStyle } from '../lib/types';
+import { Section, SectionStyle, GlobalStyle, Composition } from '../lib/types';
 import { Separator } from '@/components/ui/separator';
 
 export function CanvasPopover() {
@@ -14,8 +14,9 @@ export function CanvasPopover() {
 
     // Derived state from store
     const isActive = activeSelection.type !== 'none' && activeSelection.sectionId !== null;
-    const activeSection = isActive ? composition.sections.find(s => findSectionDeep(s, activeSelection.sectionId!)) : null;
-    const actualNode = activeSection && activeSelection.sectionId ? findSectionDeep(activeSection, activeSelection.sectionId) : null;
+    const isGlobal = activeSelection.sectionId === 'global';
+    const activeSection = (isActive && !isGlobal) ? composition.sections.find(s => findSectionDeep(s, activeSelection.sectionId!)) : null;
+    const actualNode = (activeSection && activeSelection.sectionId && !isGlobal) ? findSectionDeep(activeSection, activeSelection.sectionId) : null;
 
     const popoverRef = useRef<HTMLDivElement>(null);
 
@@ -31,22 +32,35 @@ export function CanvasPopover() {
     }, [isActive, setActiveSelection]);
 
     // Calculate a safe fixed position for the popup
-    const top = (activeSelection.rect?.top || 0) + (activeSelection.rect?.height || 0) + 10;
+    let top = (activeSelection.rect?.top || 0) + (activeSelection.rect?.height || 0) + 10;
     let left = activeSelection.rect?.left || 0;
-    let transform = "none";
+    let transformX = "0";
+    let transformY = "0";
+    let arrowClasses = "before:-top-2 before:left-4 before:border-b-card";
 
     // Edge detection: If the popover is rendering on the far right side of the screen,
     // anchor it to the right edge of the clicked element instead to prevent clipping off-screen.
-    if (typeof window !== 'undefined' && left > window.innerWidth - 350) {
-        left = activeSelection.rect?.right || left;
-        transform = "translateX(-100%)";
+    if (typeof window !== 'undefined') {
+        if (left > window.innerWidth - 350) {
+            left = activeSelection.rect?.right || left;
+            transformX = "-100%";
+            arrowClasses = arrowClasses.replace("before:left-4", "before:right-4");
+        }
+
+        // Edge detection for bottom: if the popover is rendering near the bottom edge
+        // anchor it above the element instead.
+        if (top > window.innerHeight - 400) {
+            top = (activeSelection.rect?.top || 0) - 10;
+            transformY = "-100%";
+            arrowClasses = arrowClasses.replace("before:-top-2", "before:-bottom-2").replace("before:border-b-card", "before:border-t-card");
+        }
     }
 
     const popupStyle: React.CSSProperties = {
         position: 'fixed',
         top: top,
         left: left,
-        transform: transform,
+        transform: `translate(${transformX}, ${transformY})`,
         zIndex: 50,
     };
 
@@ -75,6 +89,22 @@ export function CanvasPopover() {
         });
     };
 
+    const updateGlobalStyle = (patch: Partial<GlobalStyle>) => {
+        updateCompositionAndSync((prev) => {
+            const newComp = JSON.parse(JSON.stringify(prev));
+            newComp.style = { ...(newComp.style || {}), ...patch };
+            return newComp;
+        });
+    };
+
+    const updateGlobalText = (field: keyof Composition, value: string) => {
+        updateCompositionAndSync((prev) => {
+            const newComp = JSON.parse(JSON.stringify(prev));
+            newComp[field] = value;
+            return newComp;
+        });
+    };
+
     // Helper for the cloned tree
     function findSectionDeepInTree(sections: Section[], id: string): Section | null {
         for (const section of sections) {
@@ -95,35 +125,41 @@ export function CanvasPopover() {
         return null;
     }
 
-    if (!isActive || !actualNode) return null;
+    if (!isActive || (!actualNode && !isGlobal)) return null;
 
-    const currentStyle = actualNode.style || {};
-    const nodeLevel = activeSelection.sectionId ? (findSectionLevel(composition.sections, activeSelection.sectionId) || 1) : 1;
+    const currentStyle = actualNode?.style || {};
+    const globalStyle = composition.style || {};
+    const nodeLevel = (!isGlobal && activeSelection.sectionId) ? (findSectionLevel(composition.sections, activeSelection.sectionId) || 1) : 1;
     const isLevelCurlyBrace = nodeLevel <= 2;
     const effectiveBraceShape = currentStyle.braceShape || (isLevelCurlyBrace ? 'brace' : 'bracket');
 
-    const renderColorPicker = (label: string, field: keyof SectionStyle) => (
-        <div className="space-y-2">
-            <Label className="text-xs font-semibold">{label}</Label>
-            <div className="flex gap-2 flex-wrap">
-                {['black', '#b71c1c', '#4a148c', '#1a237e', '#1b5e20', '#e65100'].map(c => {
-                    const isSelected = currentStyle[field] === c || (!currentStyle[field] && c === 'black');
-                    return (
-                        <button
-                            key={c}
-                            className={`w-6 h-6 rounded-full border-2 ${isSelected ? 'border-ring ring-2 ring-ring ring-offset-2' : 'border-transparent'}`}
-                            style={{ backgroundColor: c }}
-                            onClick={() => {
-                                updateStyle({ [field]: c === 'black' ? undefined : c });
-                            }}
-                            title={`Set color to ${c}`}
-                            aria-label={`Set color to ${c}`}
-                        />
-                    );
-                })}
+    const renderColorPicker = (label: string, field: keyof SectionStyle | keyof GlobalStyle, isGlobalField: boolean = false) => {
+        const styleSource = isGlobalField ? globalStyle : currentStyle;
+        const updater = isGlobalField ? updateGlobalStyle : updateStyle;
+
+        return (
+            <div className="space-y-2">
+                <Label className="text-xs font-semibold">{label}</Label>
+                <div className="flex gap-2 flex-wrap">
+                    {['black', '#b71c1c', '#4a148c', '#1a237e', '#1b5e20', '#e65100'].map(c => {
+                        const isSelected = styleSource[field as keyof typeof styleSource] === c || (!styleSource[field as keyof typeof styleSource] && c === 'black');
+                        return (
+                            <button
+                                key={c}
+                                className={`w-6 h-6 rounded-full border-2 ${isSelected ? 'border-ring ring-2 ring-ring ring-offset-2' : 'border-transparent'}`}
+                                style={{ backgroundColor: c }}
+                                onClick={() => {
+                                    updater({ [field]: c === 'black' ? undefined : c });
+                                }}
+                                title={`Set color to ${c}`}
+                                aria-label={`Set color to ${c}`}
+                            />
+                        );
+                    })}
+                </div>
             </div>
-        </div>
-    );
+        );
+    };
 
     const renderContent = () => {
         switch (activeSelection.type) {
@@ -230,23 +266,25 @@ export function CanvasPopover() {
                         <Separator />
 
                         <div className="flex flex-col space-y-3">
-                            <div className="flex items-center space-x-2">
-                                <Checkbox
-                                    id="showMeasureCount"
-                                    checked={actualNode.showMeasureCount || false}
-                                    onCheckedChange={(checked) => {
-                                        updateCompositionAndSync((prev) => {
-                                            const newComp = JSON.parse(JSON.stringify(prev));
-                                            const target = findSectionDeepInTree(newComp.sections, actualNode.id);
-                                            if (target) {
-                                                target.showMeasureCount = !!checked;
-                                            }
-                                            return newComp;
-                                        });
-                                    }}
-                                />
-                                <Label htmlFor="showMeasureCount" className="text-xs font-normal cursor-pointer">Display as "Measure Count" length</Label>
-                            </div>
+                            {actualNode && (
+                                <div className="flex items-center space-x-2">
+                                    <Checkbox
+                                        id="showMeasureCount"
+                                        checked={actualNode.showMeasureCount || false}
+                                        onCheckedChange={(checked) => {
+                                            updateCompositionAndSync((prev) => {
+                                                const newComp = JSON.parse(JSON.stringify(prev));
+                                                const target = findSectionDeepInTree(newComp.sections, actualNode.id);
+                                                if (target) {
+                                                    target.showMeasureCount = !!checked;
+                                                }
+                                                return newComp;
+                                            });
+                                        }}
+                                    />
+                                    <Label htmlFor="showMeasureCount" className="text-xs font-normal cursor-pointer">Display as "Measure Count" length</Label>
+                                </div>
+                            )}
                             <div className="flex items-center space-x-2">
                                 <Checkbox
                                     id="hideMeasureRange"
@@ -266,7 +304,7 @@ export function CanvasPopover() {
                 const updateTimeSignature = (ts: string) => {
                     updateCompositionAndSync((prev) => {
                         const newComp = JSON.parse(JSON.stringify(prev));
-                        const target = findSectionDeepInTree(newComp.sections, actualNode.id);
+                        const target = actualNode ? findSectionDeepInTree(newComp.sections, actualNode.id) : null;
                         if (target) {
                             target.timeSignature = ts;
                         }
@@ -318,7 +356,7 @@ export function CanvasPopover() {
                                 return (
                                     <button
                                         key={ts}
-                                        className={`h-12 w-full flex items-center justify-center border rounded-md hover:bg-muted font-medium transition-colors ${actualNode.timeSignature === ts ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-background'}`}
+                                        className={`h-12 w-full flex items-center justify-center border rounded-md hover:bg-muted font-medium transition-colors ${(actualNode && actualNode.timeSignature === ts) ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-background'}`}
                                         onClick={() => updateTimeSignature(ts)}
                                         title={ts}
                                     >
@@ -502,6 +540,69 @@ export function CanvasPopover() {
                     </div>
                 );
 
+            case 'globalTitle':
+            case 'globalSubtitle':
+            case 'globalComposer':
+            case 'globalArranger':
+            case 'globalCreatedBy': {
+                const globalKeyMap = {
+                    'globalTitle': { text: 'title', modifiers: 'titleModifiers', color: 'titleColor', hide: 'hideTitle', defaultModifiers: ['bold'] as ('bold' | 'italic' | 'underline')[] },
+                    'globalSubtitle': { text: 'subtitle', modifiers: 'subtitleModifiers', color: 'subtitleColor', hide: 'hideSubtitle', defaultModifiers: ['italic'] as ('bold' | 'italic' | 'underline')[] },
+                    'globalComposer': { text: 'composer', modifiers: 'composerModifiers', color: 'composerColor', hide: 'hideComposer', defaultModifiers: [] as ('bold' | 'italic' | 'underline')[] },
+                    'globalArranger': { text: 'arranger', modifiers: 'arrangerModifiers', color: 'arrangerColor', hide: 'hideArranger', defaultModifiers: ['italic'] as ('bold' | 'italic' | 'underline')[] },
+                    'globalCreatedBy': { text: 'createdBy', modifiers: 'createdByModifiers', color: 'createdByColor', hide: 'hideCreatedBy', defaultModifiers: ['italic'] as ('bold' | 'italic' | 'underline')[] }
+                } as const;
+
+                const mapping = globalKeyMap[activeSelection.type as keyof typeof globalKeyMap];
+
+                return (
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <Label className="text-xs font-semibold">Style</Label>
+                            <ToggleGroup
+                                type="multiple"
+                                size="sm"
+                                className="justify-start border p-1 rounded-md"
+                                value={globalStyle[mapping.modifiers] || mapping.defaultModifiers}
+                                onValueChange={(val) => updateGlobalStyle({ [mapping.modifiers]: val as ('bold' | 'italic' | 'underline')[] })}
+                            >
+                                <ToggleGroupItem value="bold" aria-label="Toggle bold" className="h-6 w-8 px-0">
+                                    <Bold className="h-3 w-3" />
+                                </ToggleGroupItem>
+                                <ToggleGroupItem value="italic" aria-label="Toggle italic" className="h-6 w-8 px-0">
+                                    <Italic className="h-3 w-3" />
+                                </ToggleGroupItem>
+                                <ToggleGroupItem value="underline" aria-label="Toggle underline" className="h-6 w-8 px-0">
+                                    <Underline className="h-3 w-3" />
+                                </ToggleGroupItem>
+                            </ToggleGroup>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label className="text-xs font-semibold">Edit Text</Label>
+                            <Input
+                                className="h-8 text-xs"
+                                value={(composition as any)[mapping.text] || ''}
+                                onChange={(e) => updateGlobalText(mapping.text as keyof Composition, e.target.value)}
+                            />
+                        </div>
+
+                        <Separator />
+
+                        <div className="flex items-center space-x-2">
+                            <Checkbox
+                                id={mapping.hide}
+                                checked={globalStyle[mapping.hide] || false}
+                                onCheckedChange={(checked) => updateGlobalStyle({ [mapping.hide]: !!checked })}
+                            />
+                            <Label htmlFor={mapping.hide} className="text-xs font-normal cursor-pointer">Hide {activeSelection.type.replace('global', '').replace(/([A-Z])/g, ' $1').trim()}</Label>
+                        </div>
+
+                        {renderColorPicker("Color", mapping.color, true)}
+                    </div>
+                );
+            }
+
             default:
                 return null;
         }
@@ -509,7 +610,7 @@ export function CanvasPopover() {
 
     return (
         <div style={popupStyle} ref={popoverRef} className="animate-in fade-in zoom-in-95 duration-200">
-            <div className="w-64 p-4 shadow-xl rounded-xl border bg-card text-card-foreground outline-none relative before:content-[''] before:absolute before:-top-2 before:left-4 before:border-8 before:border-transparent before:border-b-card">
+            <div className={`w-64 p-4 shadow-xl rounded-xl border bg-card text-card-foreground outline-none relative before:content-[''] before:absolute before:border-8 before:border-transparent ${arrowClasses}`}>
                 <button
                     className="absolute top-2 right-2 text-muted-foreground hover:bg-muted p-1 rounded-md"
                     onClick={() => setActiveSelection({ sectionId: null, type: 'none' })}
@@ -517,8 +618,8 @@ export function CanvasPopover() {
                     <X className="h-4 w-4" />
                 </button>
                 <div className="mb-4 pr-6">
-                    <h4 className="font-semibold text-sm capitalize">{activeSelection.type.replace(/([A-Z])/g, ' $1').trim()} Settings</h4>
-                    <p className="text-xs text-muted-foreground mt-1 truncate">{actualNode.title || 'Section'}</p>
+                    <h4 className="font-semibold text-sm capitalize">{activeSelection.type.replace('global', '').replace(/([A-Z])/g, ' $1').trim()} Settings</h4>
+                    <p className="text-xs text-muted-foreground mt-1 truncate">{isGlobal ? composition.title : (actualNode?.title || 'Section')}</p>
                 </div>
                 {renderContent()}
             </div>
