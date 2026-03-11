@@ -1,6 +1,7 @@
 import React from 'react';
 import { PositionedSection, calculateTimeSigGap, wrapText } from '../../lib/layout';
 import { useStore, ActiveSelectionType } from '../../lib/store';
+import { BravuraPaths } from '../../lib/bravura-paths';
 
 interface Props {
     positioned: PositionedSection;
@@ -29,22 +30,69 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
     const formatTempoText = (text: string) => {
         const parts = text.split(/(\[w\.\]|\[h\.\]|\[q\.\]|\[e\.\]|\[s\.\]|\[w\]|\[h\]|\[q\]|\[e\]|\[s\])/);
 
+        let currentOffsetX = 0;
         return parts.map((part, index) => {
-            let smuflCode = '';
+            let pathData = null;
+            let hasDot = false;
             switch (part) {
-                case '[w.]': smuflCode = ' \uECA2 \uECB7'; break;
-                case '[h.]': smuflCode = ' \uECA3 \uECB7'; break;
-                case '[q.]': smuflCode = ' \uECA5 \uECB7'; break;
-                case '[e.]': smuflCode = ' \uECA7 \uECB7'; break;
-                case '[s.]': smuflCode = ' \uECA9 \uECB7'; break;
-                case '[w]': smuflCode = ' \uECA2'; break;
-                case '[h]': smuflCode = ' \uECA3'; break;
-                case '[q]': smuflCode = ' \uECA5'; break;
-                case '[e]': smuflCode = ' \uECA7'; break;
-                case '[s]': smuflCode = ' \uECA9'; break;
-                default: return <React.Fragment key={index}>{part}</React.Fragment>;
+                case '[w.]': pathData = BravuraPaths.W_NOTE; hasDot = true; break;
+                case '[h.]': pathData = BravuraPaths.H_NOTE; hasDot = true; break;
+                case '[q.]': pathData = BravuraPaths.Q_NOTE; hasDot = true; break;
+                case '[e.]': pathData = BravuraPaths.E_NOTE; hasDot = true; break;
+                case '[s.]': pathData = BravuraPaths.S_NOTE; hasDot = true; break;
+                case '[w]': pathData = BravuraPaths.W_NOTE; break;
+                case '[h]': pathData = BravuraPaths.H_NOTE; break;
+                case '[q]': pathData = BravuraPaths.Q_NOTE; break;
+                case '[e]': pathData = BravuraPaths.E_NOTE; break;
+                case '[s]': pathData = BravuraPaths.S_NOTE; break;
+                default:
+                    if (!part) return null;
+                    const elX = currentOffsetX;
+
+                    // Approximate widths for a 14px bold sans-serif font
+                    const getCharWidth = (char: string) => {
+                        if (char === ' ') return 4;
+                        if (/[WMOQG@\%]/.test(char)) return 11;
+                        if (/[A-Z]/.test(char)) return 9.5;
+                        if (/[ilj.,()\-\'\:\;]/.test(char)) return 4.5;
+                        if (/[0-9]/.test(char)) return 8;
+                        if (/[m]/.test(char)) return 12;
+                        if (/[w]/.test(char)) return 10;
+                        return 8; // Default lowercase/fallback
+                    };
+
+                    const width = part.split('').reduce((sum, char) => sum + getCharWidth(char), 0);
+                    currentOffsetX += width;
+
+                    return (
+                        <text key={index} x={elX} y={0}>
+                            {part}
+                        </text>
+                    );
             }
-            return <tspan key={index} fontSize={22} style={{ fontFamily: 'var(--font-bravura-text)' }}>{smuflCode}</tspan>;
+            if (pathData) {
+                const scale = 0.024;
+                // Base note width calculation
+                const noteWidth = pathData.width * scale;
+
+                // Add spacing if it has a dot
+                const dotPadding = 3; // Extra space between notehead and dot
+                const dotWidth = hasDot ? (BravuraPaths.AUG_DOT.width * scale + dotPadding) : 0;
+
+                const totalWidth = noteWidth + dotWidth;
+
+                const elX = currentOffsetX;
+                currentOffsetX += totalWidth + 4; // padding against next text
+
+                return (
+                    <g key={index} transform={`translate(${elX}, 0) scale(${scale})`} fill="currentColor">
+                        <path d={pathData.d} />
+                        {hasDot && (
+                            <path d={BravuraPaths.AUG_DOT.d} transform={`translate(${pathData.width + (dotPadding / scale)}, 0)`} />
+                        )}
+                    </g>
+                );
+            }
         });
     };
 
@@ -53,10 +101,10 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
         const elements: React.ReactNode[] = [];
         const fillC = isBlue ? '#2563eb' : 'black';
 
-        const digitMap: Record<string, string> = {
-            '0': '\uE080', '1': '\uE081', '2': '\uE082', '3': '\uE083', '4': '\uE084',
-            '5': '\uE085', '6': '\uE086', '7': '\uE087', '8': '\uE088', '9': '\uE089',
-            '+': '\uE08C', '-': '\uE08D'
+        const mapKey = (c: string): keyof typeof BravuraPaths => {
+            if (c === '+') return 'PLUS';
+            if (c === '-') return 'MINUS';
+            return `NUM_${c}` as keyof typeof BravuraPaths;
         };
 
         const tokens = timeSig.trim().split(/\s+/);
@@ -64,29 +112,32 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
         tokens.forEach((token, i) => {
             const lower = token.toLowerCase();
             if (lower === 'c' || lower === 'common') {
+                const pathData = BravuraPaths.COMMON;
                 elements.push(
-                    <text key={i} x={currentX + 8} y={20} fill={fillC} fontSize={26} style={{ fontFamily: 'var(--font-bravura-text)' }} textAnchor="middle">
-                        {'\uE08A'}
-                    </text>
+                    <g key={i} transform={`translate(${currentX}, 20) scale(0.026)`} fill={fillC}>
+                        <path d={pathData.d} />
+                    </g>
                 );
                 currentX += 16;
             } else if (lower === 'cut') {
+                const pathData = BravuraPaths.CUT;
                 elements.push(
-                    <text key={i} x={currentX + 8} y={20} fill={fillC} fontSize={26} style={{ fontFamily: 'var(--font-bravura-text)' }} textAnchor="middle">
-                        {'\uE08B'}
-                    </text>
+                    <g key={i} transform={`translate(${currentX}, 20) scale(0.026)`} fill={fillC}>
+                        <path d={pathData.d} />
+                    </g>
                 );
                 currentX += 16;
-            } else if (token === '+') {
+            } else if (token === '+' || token === '-') {
+                const pathData = token === '+' ? BravuraPaths.PLUS : BravuraPaths.MINUS;
                 elements.push(
-                    <text key={i} x={currentX + 6} y={20} fill={fillC} fontSize={20} style={{ fontFamily: 'var(--font-bravura-text)' }} textAnchor="middle">
-                        {digitMap['+']}
-                    </text>
+                    <g key={i} transform={`translate(${currentX}, 21) scale(0.02)`} fill={fillC}>
+                        <path d={pathData.d} />
+                    </g>
                 );
                 currentX += 16;
             } else if (token.includes('/')) {
                 const parts = token.split('/');
-                const getCharWidth = (c: string) => (c === '+' || c === '-') ? 14 : 6;
+                const getCharWidth = (c: string) => (c === '+' || c === '-') ? 14 : 10;
 
                 const w1 = parts[0].split('').reduce((acc, c) => acc + getCharWidth(c), 0);
                 const w2 = parts[1].split('').reduce((acc, c) => acc + getCharWidth(c), 0);
@@ -101,13 +152,16 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
 
                     return chars.map((char, index) => {
                         const cw = getCharWidth(char);
-                        const charX = localXOffset; // Start placing the character exactly here
-                        localXOffset += cw; // Reserve its width exclusively
+                        const charX = localXOffset;
+                        localXOffset += cw;
+
+                        const k = mapKey(char);
+                        if (!BravuraPaths[k]) return null;
 
                         return (
-                            <text key={`${keyBase}-${index}`} x={charX} y={yPos} fill={fillC} fontSize={26} style={{ fontFamily: 'var(--font-bravura-text)' }} textAnchor="start">
-                                {digitMap[char] || char}
-                            </text>
+                            <g key={`${keyBase}-${index}`} transform={`translate(${charX}, ${yPos}) scale(0.026)`} fill={fillC}>
+                                <path d={BravuraPaths[k].d} />
+                            </g>
                         );
                     });
                 };
@@ -242,17 +296,30 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                     onClick={(e) => handleClick(e, 'tempo')}
                 >
                     <rect x={4} y={-60} width={200} height={16} fill="transparent" />
-                    <text
-                        x={8}
-                        y={-40}
-                        fill={isSelected('tempo') ? '#2563eb' : (hideTempo ? '#d1d5db' : tempoColor)}
-                        fontSize={14}
-                        fontFamily="sans-serif"
-                        {...getFontStyle(currentStyle.tempoModifiers || ['bold'])}
-                        style={getFontStyle(currentStyle.tempoModifiers || ['bold'])}
-                    >
-                        {currentStyle.tempoTextOverride || formatTempoText(section.tempo)}
-                    </text>
+                    {currentStyle.tempoTextOverride ? (
+                        <text
+                            x={8}
+                            y={-40}
+                            fill={isSelected('tempo') ? '#2563eb' : (hideTempo ? '#d1d5db' : tempoColor)}
+                            fontSize={14}
+                            fontFamily="sans-serif"
+                            {...getFontStyle(currentStyle.tempoModifiers || ['bold'])}
+                            style={getFontStyle(currentStyle.tempoModifiers || ['bold'])}
+                        >
+                            {currentStyle.tempoTextOverride}
+                        </text>
+                    ) : (
+                        <g
+                            transform="translate(8, -40)"
+                            fill={isSelected('tempo') ? '#2563eb' : (hideTempo ? '#d1d5db' : tempoColor)}
+                            fontSize={14}
+                            fontFamily="sans-serif"
+                            {...getFontStyle(currentStyle.tempoModifiers || ['bold'])}
+                            style={getFontStyle(currentStyle.tempoModifiers || ['bold'])}
+                        >
+                            {formatTempoText(section.tempo)}
+                        </g>
+                    )}
                 </g>
             )}
 

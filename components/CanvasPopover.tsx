@@ -8,6 +8,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Bold, Italic, Underline, X } from 'lucide-react';
 import { Section, SectionStyle, GlobalStyle, Composition } from '../lib/types';
 import { Separator } from '@/components/ui/separator';
+import { BravuraPaths } from '../lib/bravura-paths';
 
 export function CanvasPopover() {
     const { composition, activeSelection, setActiveSelection, updateCompositionAndSync } = useStore();
@@ -319,28 +320,44 @@ export function CanvasPopover() {
                             {['2/2', '2/4', '3/4', '4/4', '6/8', '12/8', 'C', 'Cut'].map(ts => {
                                 let displayStr: React.ReactNode = ts;
                                 if (ts === 'C') {
-                                    displayStr = <svg width="40" height="40" className="text-current overflow-visible"><text x="20" y="26" fill="currentColor" fontSize={28} style={{ fontFamily: 'var(--font-bravura-text)' }} textAnchor="middle">{'\uE08A'}</text></svg>;
+                                    displayStr = (
+                                        <svg width="40" height="40" className="text-current overflow-visible">
+                                            <g transform="translate(20, 26) scale(0.026)" fill="currentColor">
+                                                <path d={BravuraPaths.COMMON.d} />
+                                            </g>
+                                        </svg>
+                                    );
                                 } else if (ts === 'Cut') {
-                                    displayStr = <svg width="40" height="40" className="text-current overflow-visible"><text x="20" y="26" fill="currentColor" fontSize={28} style={{ fontFamily: 'var(--font-bravura-text)' }} textAnchor="middle">{'\uE08B'}</text></svg>;
+                                    displayStr = (
+                                        <svg width="40" height="40" className="text-current overflow-visible">
+                                            <g transform="translate(20, 26) scale(0.026)" fill="currentColor">
+                                                <path d={BravuraPaths.CUT.d} />
+                                            </g>
+                                        </svg>
+                                    );
                                 } else if (ts.includes('/')) {
-                                    const digitMap: Record<string, string> = {
-                                        '0': '\uE080', '1': '\uE081', '2': '\uE082', '3': '\uE083', '4': '\uE084',
-                                        '5': '\uE085', '6': '\uE086', '7': '\uE087', '8': '\uE088', '9': '\uE089'
+                                    const mapKey = (c: string): keyof typeof BravuraPaths => {
+                                        return `NUM_${c}` as keyof typeof BravuraPaths;
                                     };
+
                                     const parts = ts.split('/');
 
                                     const renderDigits = (str: string, yPos: number, keyBase: string) => {
                                         const chars = str.split('');
-                                        const totalWidth = chars.length * 8; // approximate spacing for SMuFL digits
+                                        const totalWidth = chars.length * 10;
                                         let localXOffset = 20 - (totalWidth / 2);
 
                                         return chars.map((char, index) => {
                                             const charX = localXOffset;
-                                            localXOffset += 8;
+                                            localXOffset += 10;
+
+                                            const k = mapKey(char);
+                                            if (!BravuraPaths[k]) return null;
+
                                             return (
-                                                <text key={`${keyBase}-${index}`} x={charX} y={yPos} fill="currentColor" fontSize={28} style={{ fontFamily: 'var(--font-bravura-text)' }} textAnchor="start">
-                                                    {digitMap[char] || char}
-                                                </text>
+                                                <g key={`${keyBase}-${index}`} transform={`translate(${charX}, ${yPos}) scale(0.026)`} fill="currentColor">
+                                                    <path d={BravuraPaths[k].d} />
+                                                </g>
                                             );
                                         });
                                     };
@@ -348,7 +365,7 @@ export function CanvasPopover() {
                                     displayStr = (
                                         <svg width="40" height="40" className="text-current overflow-visible">
                                             {renderDigits(parts[0], 21, 'num')}
-                                            {renderDigits(parts[1], 31, 'den')}
+                                            {renderDigits(parts[1], 33, 'den')}
                                         </svg>
                                     );
                                 }
