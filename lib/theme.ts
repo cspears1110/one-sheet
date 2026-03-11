@@ -1,53 +1,91 @@
-import { EditorView } from "@codemirror/view";
-import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
-import { tags as t } from "@lezer/highlight";
+// lib/theme.ts
 
-// LIGHT THEME
-const lightBaseTheme = EditorView.theme({
-    "&": {
-        color: "#3f3f46", // zinc-700
-        backgroundColor: "transparent",
-    },
-    ".cm-content": {
-        caretColor: "#18181b", // zinc-900
-    },
-    "&.cm-focused .cm-cursor": {
-        borderLeftColor: "#18181b",
-    },
-    "&.cm-focused .cm-selectionBackground, ::selection": {
-        backgroundColor: "#e4e4e7", // zinc-200
-    },
-}, { dark: false });
+export const Theme = {
+    dpi: 96,
 
-const lightHighlightStyle = HighlightStyle.define([
-    { tag: t.keyword, color: "#9a3412", fontWeight: "bold" }, // orange-800 for metadata/Time/Tempo
-    { tag: t.number, color: "#0369a1", fontWeight: "bold" },  // sky-700 for measure bounds/Time signatures
-    { tag: t.string, color: "#166534", fontStyle: "italic" }, // green-800 for note syntax like [q]
-]);
-
-export const oneSheetLightTheme = [lightBaseTheme, syntaxHighlighting(lightHighlightStyle)];
-
-// DARK THEME
-const darkBaseTheme = EditorView.theme({
-    "&": {
-        color: "#e4e4e7", // zinc-200
-        backgroundColor: "transparent",
+    // Page constraints
+    page: {
+        margins: {
+            inches: 1, // 1 inch margin on all sides
+        }
     },
-    ".cm-content": {
-        caretColor: "#fafafa", // zinc-50
-    },
-    "&.cm-focused .cm-cursor": {
-        borderLeftColor: "#fafafa",
-    },
-    "&.cm-focused .cm-selectionBackground, ::selection": {
-        backgroundColor: "#52525b", // zinc-600
-    },
-}, { dark: true });
 
-const darkHighlightStyle = HighlightStyle.define([
-    { tag: t.keyword, color: "#fdba74", fontWeight: "bold" }, // orange-300
-    { tag: t.number, color: "#7dd3fc", fontWeight: "bold" },  // sky-300
-    { tag: t.string, color: "#86efac", fontStyle: "italic" }, // green-300
-]);
+    // Layout Engine
+    layout: {
+        baseSectionWidth: 150,
+        levelHeight: 60,
 
-export const oneSheetDarkTheme = [darkBaseTheme, syntaxHighlighting(darkHighlightStyle)];
+        // Vertical spacing
+        headerHeight: 120, // Space reserved at the top for title, composer, etc.
+        footerHeight: 40,  // Space reserved at the bottom
+        staffMarginBottom: 20, // Space between staves
+        tempoPadding: 40, // Extra top margin if staff has a tempo marking
+
+        // Element padding and spacing
+        horizontalPadding: 8, // General horizontal padding inside sections
+
+        // Character width estimations (for approximate text wrapping and sizing)
+        charWidths: {
+            default: 6.5,
+            measureNumber: 7, // slightly wider or different font choice
+            title: 9, // larger font
+            tempo: 9,
+            timeSigPlusMinus: 14, // + or - in time sig
+            timeSigDigit: 6,
+        },
+
+        // Specific feature footprints
+        startMeasureShapeWidth: 30,
+        timeSigBaseGap: 14,
+        timeSigCommonWaitGap: 16, // 'C' or 'Cut'
+    }
+};
+
+import { createTheme } from '@uiw/codemirror-themes';
+import { tags as t } from '@lezer/highlight';
+
+export const oneSheetLightTheme = createTheme({
+    theme: 'light',
+    settings: {
+        background: '#ffffff',
+        backgroundImage: '',
+        foreground: '#374151',
+        caret: '#000000',
+        selection: '#e5e7eb',
+        selectionMatch: '#e5e7eb',
+        lineHighlight: '#f3f4f6',
+        gutterBackground: '#ffffff',
+        gutterForeground: '#9ca3af',
+    },
+    styles: [
+        { tag: t.keyword, color: '#2563eb', fontWeight: 'bold' },     // Blue keywords
+        { tag: t.number, color: '#ea580c', fontWeight: 'bold' },      // Orange numbers (measure ranges)
+        { tag: t.string, color: '#16a34a', fontWeight: 'bold' },      // Green notes [q]
+        { tag: t.comment, color: '#9ca3af', fontStyle: 'italic' },    // Gray comments
+        { tag: t.heading, color: '#111827', fontWeight: 'bold' },     // Dark text headings
+        { tag: t.punctuation, color: '#6b7280' },                     // Gray punctuation
+    ],
+});
+
+export const oneSheetDarkTheme = createTheme({
+    theme: 'dark',
+    settings: {
+        background: '#18181b', // Zinc 900
+        backgroundImage: '',
+        foreground: '#e4e4e7', // Zinc 200
+        caret: '#ffffff',
+        selection: '#27272a',  // Zinc 800
+        selectionMatch: '#27272a',
+        lineHighlight: '#27272a',
+        gutterBackground: '#18181b',
+        gutterForeground: '#71717a', // Zinc 500
+    },
+    styles: [
+        { tag: t.keyword, color: '#60a5fa', fontWeight: 'bold' },     // Light Blue keywords
+        { tag: t.number, color: '#fb923c', fontWeight: 'bold' },      // Light Orange numbers (measure ranges)
+        { tag: t.string, color: '#4ade80', fontWeight: 'bold' },      // Light Green notes [q]
+        { tag: t.comment, color: '#a1a1aa', fontStyle: 'italic' },    // Zinc comments
+        { tag: t.heading, color: '#f4f4f5', fontWeight: 'bold' },     // Light text headings
+        { tag: t.punctuation, color: '#a1a1aa' },                     // Zinc punctuation
+    ],
+});

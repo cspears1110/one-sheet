@@ -1,4 +1,6 @@
 import { Composition, Section } from './types';
+import { Theme } from './theme';
+import { measureTextWidth } from './measure-text';
 
 export interface PositionedSection {
     section: Section;
@@ -26,42 +28,41 @@ export interface LayoutConfig {
     levelHeight: number;
 }
 
-// Convert inches to pixels (assumes standard 96 DPI CSS pixels)
-const DPI = 96;
 const PAGE_DIMENSIONS: Record<import('./types').PageSize, { width: number; height: number }> = {
-    letter: { width: 8.5 * DPI, height: 11 * DPI },
-    legal: { width: 8.5 * DPI, height: 14 * DPI },
-    tabloid: { width: 11 * DPI, height: 17 * DPI },
+    letter: { width: 8.5 * Theme.dpi, height: 11 * Theme.dpi },
+    legal: { width: 8.5 * Theme.dpi, height: 14 * Theme.dpi },
+    tabloid: { width: 11 * Theme.dpi, height: 17 * Theme.dpi },
 };
 
 export function getLayoutConfig(pageConfig: import('./types').PageConfig): LayoutConfig {
     const dims = PAGE_DIMENSIONS[pageConfig.size];
 
-    // Determine effective width based on orientation, subtracting 2 inches for margins (1in each side)
+    // Determine effective width based on orientation, subtracting margins
+    const marginPx = Theme.page.margins.inches * Theme.dpi * 2; // Left + Right or Top + Bottom
     const effectiveWidth = pageConfig.orientation === 'landscape' ? dims.height : dims.width;
     const effectiveHeight = pageConfig.orientation === 'landscape' ? dims.width : dims.height;
 
-    const maxWidth = effectiveWidth - (2 * DPI);
-    const maxHeight = effectiveHeight - (2 * DPI);
+    const maxWidth = effectiveWidth - marginPx;
+    const maxHeight = effectiveHeight - marginPx;
 
     return {
         maxWidth,
         maxHeight,
-        baseSectionWidth: 150,
-        levelHeight: 60,
+        baseSectionWidth: Theme.layout.baseSectionWidth,
+        levelHeight: Theme.layout.levelHeight,
     };
 }
 
 export function calculateTimeSigGap(timeSig?: string): number {
     if (!timeSig) return 0;
     const tokens = timeSig.trim().split(/\s+/);
-    let gap = 14;
+    let gap = Theme.layout.timeSigBaseGap;
     tokens.forEach(t => {
         const lower = t.toLowerCase();
-        if (lower === 'c' || lower === 'cut' || t === '+') gap += 16;
+        if (lower === 'c' || lower === 'cut' || t === '+') gap += Theme.layout.timeSigCommonWaitGap;
         else if (t.includes('/')) {
             const parts = t.split('/');
-            const getCharWidth = (c: string) => (c === '+' || c === '-') ? 14 : 6;
+            const getCharWidth = (c: string) => (c === '+' || c === '-') ? Theme.layout.charWidths.timeSigPlusMinus : Theme.layout.charWidths.timeSigDigit;
             const w1 = parts[0].split('').reduce((acc, c) => acc + getCharWidth(c), 0);
             const w2 = parts[1].split('').reduce((acc, c) => acc + getCharWidth(c), 0);
             gap += Math.max(w1, w2) + 8;
@@ -72,9 +73,9 @@ export function calculateTimeSigGap(timeSig?: string): number {
     return gap;
 }
 
-// Helper to wrap text into lines based on an approximate pixel width per character.
+// Helper to wrap text into lines using precise canvas measurements.
 // Returns the array of lines and the maximum actual width used.
-export function wrapText(text: string, maxPixelWidth: number, approxCharWidth = 6.5): { lines: string[], actualMaxWidth: number } {
+export function wrapText(text: string, maxPixelWidth: number, font: string = '12px sans-serif'): { lines: string[], actualMaxWidth: number } {
     if (!text) return { lines: [], actualMaxWidth: 0 };
 
     // Hard breaks encoded by user
@@ -88,12 +89,12 @@ export function wrapText(text: string, maxPixelWidth: number, approxCharWidth = 
 
         words.forEach(word => {
             const testLine = currentLine ? `${currentLine} ${word}` : word;
-            const testWidth = testLine.length * approxCharWidth;
+            const testWidth = measureTextWidth(testLine, font);
 
             if (testWidth > maxPixelWidth && currentLine) {
                 // Wrap to next line
                 displayLines.push(currentLine);
-                const currentWidth = currentLine.length * approxCharWidth;
+                const currentWidth = measureTextWidth(currentLine, font);
                 if (currentWidth > absoluteMaxWidth) absoluteMaxWidth = currentWidth;
                 currentLine = word;
             } else {
@@ -103,7 +104,7 @@ export function wrapText(text: string, maxPixelWidth: number, approxCharWidth = 
 
         if (currentLine) {
             displayLines.push(currentLine);
-            const currentWidth = currentLine.length * approxCharWidth;
+            const currentWidth = measureTextWidth(currentLine, font);
             if (currentWidth > absoluteMaxWidth) absoluteMaxWidth = currentWidth;
         }
     });
@@ -114,27 +115,27 @@ export function wrapText(text: string, maxPixelWidth: number, approxCharWidth = 
 // Helper to determine the minimum dimensions required for a section subtree
 function calculateMinDimensions(section: Section, config: LayoutConfig, inferredEnd?: number): { width: number; depth: number } {
     const hasShape = section.style?.startMeasureShape === 'circle' || section.style?.startMeasureShape === 'square';
-    const startMeasureFootprint = hasShape ? 30 : (section.startMeasure.toString().length * 7); // Approx 7px per char without shape, 30px with shape
+    const startMeasureFootprint = hasShape ? Theme.layout.startMeasureShapeWidth : (section.startMeasure.toString().length * Theme.layout.charWidths.measureNumber);
 
     const endM = section.endMeasure ?? inferredEnd ?? section.startMeasure;
     const rangeStrWidth = section.showMeasureCount ?
-        ((endM - section.startMeasure + 1).toString().length * 7) :
-        (`${section.startMeasure}-${endM}`.length * 7);
+        ((endM - section.startMeasure + 1).toString().length * Theme.layout.charWidths.measureNumber) :
+        (`${section.startMeasure}-${endM}`.length * Theme.layout.charWidths.measureNumber);
 
     // To prevent overlap: Left item ends at (4 + startMeasureFootprint + padding).
     // Center item begins at (width / 2 - rangeStrWidth / 2).
     // So: width / 2 >= 4 + startMeasureFootprint + padding + rangeStrWidth / 2
     // width >= 2 * (4 + startMeasureFootprint + padding) + rangeStrWidth
-    const padding = 8;
+    const padding = Theme.layout.horizontalPadding;
     const minMeasureTextWidth = 2 * (4 + startMeasureFootprint + padding) + rangeStrWidth;
 
     // Ensure there's a minimum baseline width so tiny titles or measure counts don't get squished.
     const titleText = section.title || '';
-    const textWidth = Math.max((titleText.length * 9) + 40, 60, minMeasureTextWidth);
+    const textWidth = Math.max((titleText.length * Theme.layout.charWidths.title) + 40, 60, minMeasureTextWidth);
 
     // Add additional width if there are annotations or tempo markings
     const annotationsWidth = section.annotations.length > 0 ? 50 : 0;
-    const tempoWidth = section.tempo ? Math.max(section.tempo.length * 9, 80) : 0;
+    const tempoWidth = section.tempo ? Math.max(section.tempo.length * Theme.layout.charWidths.tempo, 80) : 0;
     const timeSigGap = calculateTimeSigGap(section.timeSignature);
 
     let selfMinWidth = Math.max(textWidth + annotationsWidth, tempoWidth, minMeasureTextWidth) + timeSigGap;
@@ -282,7 +283,7 @@ export function computeLayout(composition: Composition, config: LayoutConfig): S
         // If any top-level section in this staff has a tempo marking, we need extra top margin
         // so it doesn't collide with the header or the staff above it.
         const hasTempo = currentStaffSections.some(s => s.section.tempo);
-        const tempoPadding = hasTempo ? 40 : 0;
+        const tempoPadding = hasTempo ? Theme.layout.tempoPadding : 0;
 
         const maxSubtreeHeight = Math.max(...currentStaffSections.map(s => s.subtreeHeight));
 
@@ -290,14 +291,14 @@ export function computeLayout(composition: Composition, config: LayoutConfig): S
             extendSubtreeHeight(s, maxSubtreeHeight);
         });
 
-        const staffHeight = maxSubtreeHeight + 40 + tempoPadding; // padding
+        const staffHeight = maxSubtreeHeight + 40 + tempoPadding; // bottom padding for staff content
         staves.push({
             id: `staff-${staves.length}`,
             y: currentStaffY + tempoPadding, // Push the drawing origin down to make room above
             height: staffHeight,
             sections: currentStaffSections,
         });
-        currentStaffY += staffHeight + 20; // staff margin
+        currentStaffY += staffHeight + Theme.layout.staffMarginBottom; // staff margin
         currentStaffSections = [];
         currentStaffX = 0;
     };

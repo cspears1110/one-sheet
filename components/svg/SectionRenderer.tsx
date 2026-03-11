@@ -2,6 +2,7 @@ import React from 'react';
 import { PositionedSection, calculateTimeSigGap, wrapText } from '../../lib/layout';
 import { useStore, ActiveSelectionType } from '../../lib/store';
 import { BravuraPaths } from '../../lib/bravura-paths';
+import { SmuflNote, SmuflTimeSigChar } from './SmuflComponents';
 
 interface Props {
     positioned: PositionedSection;
@@ -84,13 +85,22 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                 const elX = currentOffsetX;
                 currentOffsetX += totalWidth + 4; // padding against next text
 
+                // Map the duration shorthand back to standard names for SmuflNote
+                const durationMap: Record<string, string> = {
+                    '[w.]': 'w', '[h.]': 'h', '[q.]': 'q', '[e.]': 'e', '[s.]': 's',
+                    '[w]': 'w', '[h]': 'h', '[q]': 'q', '[e]': 'e', '[s]': 's'
+                };
+
+                const dur = durationMap[part] as 'w' | 'h' | 'q' | 'e' | 's';
+
                 return (
-                    <g key={index} transform={`translate(${elX}, 0) scale(${scale})`} fill="currentColor">
-                        <path d={pathData.d} />
-                        {hasDot && (
-                            <path d={BravuraPaths.AUG_DOT.d} transform={`translate(${pathData.width + (dotPadding / scale)}, 0)`} />
-                        )}
-                    </g>
+                    <SmuflNote
+                        key={index}
+                        duration={dur}
+                        dotted={hasDot}
+                        scale={scale}
+                        transform={`translate(${elX}, 0)`}
+                    />
                 );
             }
         });
@@ -112,27 +122,18 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
         tokens.forEach((token, i) => {
             const lower = token.toLowerCase();
             if (lower === 'c' || lower === 'common') {
-                const pathData = BravuraPaths.COMMON;
                 elements.push(
-                    <g key={i} transform={`translate(${currentX}, 20) scale(0.026)`} fill={fillC}>
-                        <path d={pathData.d} />
-                    </g>
+                    <SmuflTimeSigChar key={i} char="c" transform={`translate(${currentX}, 20)`} fill={fillC} />
                 );
                 currentX += 16;
             } else if (lower === 'cut') {
-                const pathData = BravuraPaths.CUT;
                 elements.push(
-                    <g key={i} transform={`translate(${currentX}, 20) scale(0.026)`} fill={fillC}>
-                        <path d={pathData.d} />
-                    </g>
+                    <SmuflTimeSigChar key={i} char="cut" transform={`translate(${currentX}, 20)`} fill={fillC} />
                 );
                 currentX += 16;
             } else if (token === '+' || token === '-') {
-                const pathData = token === '+' ? BravuraPaths.PLUS : BravuraPaths.MINUS;
                 elements.push(
-                    <g key={i} transform={`translate(${currentX}, 21) scale(0.02)`} fill={fillC}>
-                        <path d={pathData.d} />
-                    </g>
+                    <SmuflTimeSigChar key={i} char={token} scale={0.02} transform={`translate(${currentX}, 21)`} fill={fillC} />
                 );
                 currentX += 16;
             } else if (token.includes('/')) {
@@ -155,13 +156,13 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                         const charX = localXOffset;
                         localXOffset += cw;
 
-                        const k = mapKey(char);
-                        if (!BravuraPaths[k]) return null;
-
                         return (
-                            <g key={`${keyBase}-${index}`} transform={`translate(${charX}, ${yPos}) scale(0.026)`} fill={fillC}>
-                                <path d={BravuraPaths[k].d} />
-                            </g>
+                            <SmuflTimeSigChar
+                                key={`${keyBase}-${index}`}
+                                char={char}
+                                transform={`translate(${charX}, ${yPos})`}
+                                fill={fillC}
+                            />
                         );
                     });
                 };

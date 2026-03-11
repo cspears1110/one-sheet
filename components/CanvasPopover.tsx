@@ -1,14 +1,23 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import { useStore } from '../lib/store';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { Bold, Italic, Underline, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { Section, SectionStyle, GlobalStyle, Composition } from '../lib/types';
-import { Separator } from '@/components/ui/separator';
-import { BravuraPaths } from '../lib/bravura-paths';
+import {
+    useFloating,
+    autoUpdate,
+    offset,
+    flip,
+    shift,
+    useTransitionStyles,
+} from '@floating-ui/react';
+import {
+    StartMeasurePanel,
+    MeasureRangePanel,
+    BracePanel,
+    GenericTextPanel
+} from './popover/SectionSettingsPanels';
+import { TimeSignaturePanel } from './popover/TimeSignaturePanel';
+import { GlobalTextPanel } from './popover/GlobalTextPanel';
 
 export function CanvasPopover() {
     const { composition, activeSelection, setActiveSelection, updateCompositionAndSync } = useStore();
@@ -19,7 +28,25 @@ export function CanvasPopover() {
     const activeSection = (isActive && !isGlobal) ? composition.sections.find(s => findSectionDeep(s, activeSelection.sectionId!)) : null;
     const actualNode = (activeSection && activeSelection.sectionId && !isGlobal) ? findSectionDeep(activeSection, activeSelection.sectionId) : null;
 
-    const popoverRef = useRef<HTMLDivElement>(null);
+    // Set up floating UI
+    const { refs, floatingStyles, context, placement } = useFloating({
+        open: isActive,
+        placement: 'bottom-start',
+        middleware: [
+            offset(10), // 10px spacing from the target
+            flip({ fallbackAxisSideDirection: 'end' }), // Flip safely if it hits the bottom
+            shift({ padding: 12 }) // Prevent it from going off-screen horizontally
+        ],
+        whileElementsMounted: autoUpdate,
+    });
+
+    // Add simple fade animation
+    const { isMounted, styles: transitionStyles } = useTransitionStyles(context, {
+        duration: 150,
+        initial: { opacity: 0, transform: 'scale(0.95)' },
+        open: { opacity: 1, transform: 'scale(1)' },
+        close: { opacity: 0, transform: 'scale(0.95)' },
+    });
 
     // Close on click outside or escape key
     useEffect(() => {
@@ -32,38 +59,28 @@ export function CanvasPopover() {
         return () => document.removeEventListener('keydown', handleKeyDown);
     }, [isActive, setActiveSelection]);
 
-    // Calculate a safe fixed position for the popup
-    let top = (activeSelection.rect?.top || 0) + (activeSelection.rect?.height || 0) + 10;
-    let left = activeSelection.rect?.left || 0;
-    let transformX = "0";
-    let transformY = "0";
-    let arrowClasses = "before:-top-2 before:left-4 before:border-b-card";
-
-    // Edge detection: If the popover is rendering on the far right side of the screen,
-    // anchor it to the right edge of the clicked element instead to prevent clipping off-screen.
-    if (typeof window !== 'undefined') {
-        if (left > window.innerWidth - 350) {
-            left = activeSelection.rect?.right || left;
-            transformX = "-100%";
-            arrowClasses = arrowClasses.replace("before:left-4", "before:right-4");
+    // Provide virtual element for floating-ui based on the click coordinates/rect
+    useEffect(() => {
+        if (isActive && activeSelection.rect) {
+            refs.setReference({
+                getBoundingClientRect: () => activeSelection.rect as DOMRect,
+            });
+        } else {
+            refs.setReference(null);
         }
+    }, [isActive, activeSelection.rect, refs]);
 
-        // Edge detection for bottom: if the popover is rendering near the bottom edge
-        // anchor it above the element instead.
-        if (top > window.innerHeight - 400) {
-            top = (activeSelection.rect?.top || 0) - 10;
-            transformY = "-100%";
-            arrowClasses = arrowClasses.replace("before:-top-2", "before:-bottom-2").replace("before:border-b-card", "before:border-t-card");
-        }
+    // Determine arrow directional classes based on floating-ui placement
+    let arrowClasses = "";
+    if (placement.startsWith('top')) {
+        arrowClasses = "before:-bottom-2 before:left-4 before:border-t-card";
+    } else if (placement.startsWith('bottom')) {
+        arrowClasses = "before:-top-2 before:left-4 before:border-b-card";
+    } else if (placement.startsWith('left')) {
+        arrowClasses = "before:-right-2 before:top-4 before:border-l-card";
+    } else {
+        arrowClasses = "before:-left-2 before:top-4 before:border-r-card";
     }
-
-    const popupStyle: React.CSSProperties = {
-        position: 'fixed',
-        top: top,
-        left: left,
-        transform: `translate(${transformX}, ${transformY})`,
-        zIndex: 50,
-    };
 
     // Helper to deeply find a section by ID
     function findSectionDeep(node: Section, id: string): Section | null {
@@ -134,499 +151,74 @@ export function CanvasPopover() {
     const isLevelCurlyBrace = nodeLevel <= 2;
     const effectiveBraceShape = currentStyle.braceShape || (isLevelCurlyBrace ? 'brace' : 'bracket');
 
-    const renderColorPicker = (label: string, field: keyof SectionStyle | keyof GlobalStyle, isGlobalField: boolean = false) => {
-        const styleSource = isGlobalField ? globalStyle : currentStyle;
-        const updater = isGlobalField ? updateGlobalStyle : updateStyle;
-
-        return (
-            <div className="space-y-2">
-                <Label className="text-xs font-semibold">{label}</Label>
-                <div className="flex gap-2 flex-wrap">
-                    {['black', '#b71c1c', '#4a148c', '#1a237e', '#1b5e20', '#e65100'].map(c => {
-                        const isSelected = styleSource[field as keyof typeof styleSource] === c || (!styleSource[field as keyof typeof styleSource] && c === 'black');
-                        return (
-                            <button
-                                key={c}
-                                className={`w-6 h-6 rounded-full border-2 ${isSelected ? 'border-ring ring-2 ring-ring ring-offset-2' : 'border-transparent'}`}
-                                style={{ backgroundColor: c }}
-                                onClick={() => {
-                                    updater({ [field]: c === 'black' ? undefined : c });
-                                }}
-                                title={`Set color to ${c}`}
-                                aria-label={`Set color to ${c}`}
-                            />
-                        );
-                    })}
-                </div>
-            </div>
-        );
-    };
-
     const renderContent = () => {
         switch (activeSelection.type) {
             case 'startMeasure':
-                return (
-                    <div className="space-y-4">
-                        <div className="space-y-2">
-                            <Label className="text-xs font-semibold">Shape</Label>
-                            <Select
-                                value={currentStyle.startMeasureShape || 'none'}
-                                onValueChange={(val) => updateStyle({ startMeasureShape: val as 'circle' | 'square' | 'none' })}
-                            >
-                                <SelectTrigger className="w-full text-xs h-8">
-                                    <SelectValue placeholder="Shape" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="none">None</SelectItem>
-                                    <SelectItem value="square">Square</SelectItem>
-                                    <SelectItem value="circle">Circle</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label className="text-xs font-semibold">Style</Label>
-                            <ToggleGroup
-                                type="multiple"
-                                size="sm"
-                                className="justify-start border p-1 rounded-md"
-                                value={currentStyle.startMeasureTextModifiers || ['bold']}
-                                onValueChange={(val) => updateStyle({ startMeasureTextModifiers: val as ('bold' | 'italic' | 'underline')[] })}
-                            >
-                                <ToggleGroupItem value="bold" aria-label="Toggle bold" className="h-6 w-8 px-0">
-                                    <Bold className="h-3 w-3" />
-                                </ToggleGroupItem>
-                                <ToggleGroupItem value="italic" aria-label="Toggle italic" className="h-6 w-8 px-0">
-                                    <Italic className="h-3 w-3" />
-                                </ToggleGroupItem>
-                                <ToggleGroupItem value="underline" aria-label="Toggle underline" className="h-6 w-8 px-0">
-                                    <Underline className="h-3 w-3" />
-                                </ToggleGroupItem>
-                            </ToggleGroup>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label className="text-xs font-semibold">Override Text</Label>
-                            <Input
-                                className="h-8 text-xs"
-                                placeholder="ex. 1a"
-                                value={currentStyle.startMeasureTextOverride || ''}
-                                onChange={(e) => updateStyle({ startMeasureTextOverride: e.target.value })}
-                            />
-                        </div>
-
-                        <Separator />
-
-                        <div className="flex items-center space-x-2">
-                            <Checkbox
-                                id="hideStartMeasure"
-                                checked={currentStyle.hideStartMeasure || false}
-                                onCheckedChange={(checked) => updateStyle({ hideStartMeasure: !!checked })}
-                            />
-                            <Label htmlFor="hideStartMeasure" className="text-xs font-normal cursor-pointer">Hide Number</Label>
-                        </div>
-
-                        {renderColorPicker("Color", "startMeasureColor")}
-                    </div>
-                );
-
+                return <StartMeasurePanel style={currentStyle} updateStyle={updateStyle} />;
             case 'measureRange':
                 return (
-                    <div className="space-y-4">
-                        <div className="space-y-2">
-                            <Label className="text-xs font-semibold">Style</Label>
-                            <ToggleGroup
-                                type="multiple"
-                                size="sm"
-                                className="justify-start border p-1 rounded-md"
-                                value={currentStyle.measureRangeTextModifiers || []}
-                                onValueChange={(val) => updateStyle({ measureRangeTextModifiers: val as ('bold' | 'italic' | 'underline')[] })}
-                            >
-                                <ToggleGroupItem value="bold" aria-label="Toggle bold" className="h-6 w-8 px-0">
-                                    <Bold className="h-3 w-3" />
-                                </ToggleGroupItem>
-                                <ToggleGroupItem value="italic" aria-label="Toggle italic" className="h-6 w-8 px-0">
-                                    <Italic className="h-3 w-3" />
-                                </ToggleGroupItem>
-                                <ToggleGroupItem value="underline" aria-label="Toggle underline" className="h-6 w-8 px-0">
-                                    <Underline className="h-3 w-3" />
-                                </ToggleGroupItem>
-                            </ToggleGroup>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label className="text-xs font-semibold">Override Text</Label>
-                            <Input
-                                className="h-8 text-xs"
-                                placeholder="ex. verses"
-                                value={currentStyle.measureRangeTextOverride || ''}
-                                onChange={(e) => updateStyle({ measureRangeTextOverride: e.target.value })}
-                            />
-                        </div>
-
-                        <Separator />
-
-                        <div className="flex flex-col space-y-3">
-                            {actualNode && (
-                                <div className="flex items-center space-x-2">
-                                    <Checkbox
-                                        id="showMeasureCount"
-                                        checked={actualNode.showMeasureCount || false}
-                                        onCheckedChange={(checked) => {
-                                            updateCompositionAndSync((prev) => {
-                                                const newComp = JSON.parse(JSON.stringify(prev));
-                                                const target = findSectionDeepInTree(newComp.sections, actualNode.id);
-                                                if (target) {
-                                                    target.showMeasureCount = !!checked;
-                                                }
-                                                return newComp;
-                                            });
-                                        }}
-                                    />
-                                    <Label htmlFor="showMeasureCount" className="text-xs font-normal cursor-pointer">Display as "Measure Count" length</Label>
-                                </div>
-                            )}
-                            <div className="flex items-center space-x-2">
-                                <Checkbox
-                                    id="hideMeasureRange"
-                                    checked={currentStyle.hideMeasureRange || false}
-                                    onCheckedChange={(checked) => updateStyle({ hideMeasureRange: !!checked })}
-                                />
-                                <Label htmlFor="hideMeasureRange" className="text-xs font-normal cursor-pointer">Hide Range completely</Label>
-                            </div>
-                        </div>
-
-                        {renderColorPicker("Color", "measureRangeColor")}
-                    </div>
+                    <MeasureRangePanel
+                        style={currentStyle}
+                        updateStyle={updateStyle}
+                        showMeasureCount={actualNode?.showMeasureCount || false}
+                        onToggleShowMeasureCount={(show) => {
+                            if (!actualNode) return;
+                            updateCompositionAndSync((prev) => {
+                                const newComp = JSON.parse(JSON.stringify(prev));
+                                const target = findSectionDeepInTree(newComp.sections, actualNode.id);
+                                if (target) target.showMeasureCount = show;
+                                return newComp;
+                            });
+                        }}
+                    />
                 );
-
             case 'timeSignature':
-                // Updating Time Signature fundamentally changes the logical AST model, not just a style override
-                const updateTimeSignature = (ts: string) => {
-                    updateCompositionAndSync((prev) => {
-                        const newComp = JSON.parse(JSON.stringify(prev));
-                        const target = actualNode ? findSectionDeepInTree(newComp.sections, actualNode.id) : null;
-                        if (target) {
-                            target.timeSignature = ts;
-                        }
-                        return newComp;
-                    });
-                };
-
                 return (
-                    <div className="space-y-3">
-                        <Label className="text-xs font-semibold">Common Signatures</Label>
-                        <div className="grid grid-cols-4 gap-2">
-                            {['2/2', '2/4', '3/4', '4/4', '6/8', '12/8', 'C', 'Cut'].map(ts => {
-                                let displayStr: React.ReactNode = ts;
-                                if (ts === 'C') {
-                                    displayStr = (
-                                        <svg width="40" height="40" className="text-current overflow-visible">
-                                            <g transform="translate(20, 26) scale(0.026)" fill="currentColor">
-                                                <path d={BravuraPaths.COMMON.d} />
-                                            </g>
-                                        </svg>
-                                    );
-                                } else if (ts === 'Cut') {
-                                    displayStr = (
-                                        <svg width="40" height="40" className="text-current overflow-visible">
-                                            <g transform="translate(20, 26) scale(0.026)" fill="currentColor">
-                                                <path d={BravuraPaths.CUT.d} />
-                                            </g>
-                                        </svg>
-                                    );
-                                } else if (ts.includes('/')) {
-                                    const mapKey = (c: string): keyof typeof BravuraPaths => {
-                                        return `NUM_${c}` as keyof typeof BravuraPaths;
-                                    };
-
-                                    const parts = ts.split('/');
-
-                                    const renderDigits = (str: string, yPos: number, keyBase: string) => {
-                                        const chars = str.split('');
-                                        const totalWidth = chars.length * 10;
-                                        let localXOffset = 20 - (totalWidth / 2);
-
-                                        return chars.map((char, index) => {
-                                            const charX = localXOffset;
-                                            localXOffset += 10;
-
-                                            const k = mapKey(char);
-                                            if (!BravuraPaths[k]) return null;
-
-                                            return (
-                                                <g key={`${keyBase}-${index}`} transform={`translate(${charX}, ${yPos}) scale(0.026)`} fill="currentColor">
-                                                    <path d={BravuraPaths[k].d} />
-                                                </g>
-                                            );
-                                        });
-                                    };
-
-                                    displayStr = (
-                                        <svg width="40" height="40" className="text-current overflow-visible">
-                                            {renderDigits(parts[0], 21, 'num')}
-                                            {renderDigits(parts[1], 33, 'den')}
-                                        </svg>
-                                    );
-                                }
-
-                                return (
-                                    <button
-                                        key={ts}
-                                        className={`h-12 w-full flex items-center justify-center border rounded-md hover:bg-muted font-medium transition-colors ${(actualNode && actualNode.timeSignature === ts) ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-background'}`}
-                                        onClick={() => updateTimeSignature(ts)}
-                                        title={ts}
-                                    >
-                                        {displayStr}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
+                    <TimeSignaturePanel
+                        currentTimeSignature={actualNode?.timeSignature}
+                        onUpdate={(ts) => {
+                            if (!actualNode) return;
+                            updateCompositionAndSync((prev) => {
+                                const newComp = JSON.parse(JSON.stringify(prev));
+                                const target = findSectionDeepInTree(newComp.sections, actualNode.id);
+                                if (target) target.timeSignature = ts;
+                                return newComp;
+                            });
+                        }}
+                    />
                 );
-
             case 'brace':
-                return (
-                    <div className="space-y-4">
-                        <div className="space-y-2">
-                            <Label className="text-xs font-semibold">Brace Shape</Label>
-                            <Select
-                                value={effectiveBraceShape}
-                                onValueChange={(val) => updateStyle({ braceShape: val as 'brace' | 'bracket' | 'line' | 'none' })}
-                            >
-                                <SelectTrigger className="w-full text-xs h-8">
-                                    <SelectValue placeholder="Shape" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="brace">Curly Brace</SelectItem>
-                                    <SelectItem value="bracket">Square Bracket</SelectItem>
-                                    <SelectItem value="line">Straight Line</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        {renderColorPicker("Color", "braceColor")}
-
-                        <Separator />
-
-                        <div className="flex flex-col space-y-3">
-                            <div className="flex items-center space-x-2">
-                                <Checkbox
-                                    id="braceDashed"
-                                    checked={currentStyle.braceDashed || false}
-                                    onCheckedChange={(checked) => updateStyle({ braceDashed: !!checked })}
-                                />
-                                <Label htmlFor="braceDashed" className="text-xs font-normal cursor-pointer">Dashed Line</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                                <Checkbox
-                                    id="hideBrace"
-                                    checked={currentStyle.hideBrace || false}
-                                    onCheckedChange={(checked) => updateStyle({ hideBrace: !!checked })}
-                                />
-                                <Label htmlFor="hideBrace" className="text-xs font-normal cursor-pointer">Hide Brace</Label>
-                            </div>
-                        </div>
-                    </div>
-                );
-
+                return <BracePanel style={currentStyle} effectiveBraceShape={effectiveBraceShape} updateStyle={updateStyle} />;
             case 'title':
-                return (
-                    <div className="space-y-4">
-                        <div className="space-y-2">
-                            <Label className="text-xs font-semibold">Style</Label>
-                            <ToggleGroup
-                                type="multiple"
-                                size="sm"
-                                className="justify-start border p-1 rounded-md"
-                                value={currentStyle.titleModifiers || ['bold']}
-                                onValueChange={(val) => updateStyle({ titleModifiers: val as ('bold' | 'italic' | 'underline')[] })}
-                            >
-                                <ToggleGroupItem value="bold" aria-label="Toggle bold" className="h-6 w-8 px-0">
-                                    <Bold className="h-3 w-3" />
-                                </ToggleGroupItem>
-                                <ToggleGroupItem value="italic" aria-label="Toggle italic" className="h-6 w-8 px-0">
-                                    <Italic className="h-3 w-3" />
-                                </ToggleGroupItem>
-                                <ToggleGroupItem value="underline" aria-label="Toggle underline" className="h-6 w-8 px-0">
-                                    <Underline className="h-3 w-3" />
-                                </ToggleGroupItem>
-                            </ToggleGroup>
-                        </div>
-
-                        <Separator />
-
-                        <div className="flex items-center space-x-2">
-                            <Checkbox
-                                id="hideTitle"
-                                checked={currentStyle.hideTitle || false}
-                                onCheckedChange={(checked) => updateStyle({ hideTitle: !!checked })}
-                            />
-                            <Label htmlFor="hideTitle" className="text-xs font-normal cursor-pointer">Hide Title</Label>
-                        </div>
-
-                        {renderColorPicker("Color", "titleColor")}
-                    </div>
-                );
-
             case 'text':
-                return (
-                    <div className="space-y-4">
-                        <div className="space-y-2">
-                            <Label className="text-xs font-semibold">Style</Label>
-                            <ToggleGroup
-                                type="multiple"
-                                size="sm"
-                                className="justify-start border p-1 rounded-md"
-                                value={currentStyle.textModifiers || []}
-                                onValueChange={(val) => updateStyle({ textModifiers: val as ('bold' | 'italic' | 'underline')[] })}
-                            >
-                                <ToggleGroupItem value="bold" aria-label="Toggle bold" className="h-6 w-8 px-0">
-                                    <Bold className="h-3 w-3" />
-                                </ToggleGroupItem>
-                                <ToggleGroupItem value="italic" aria-label="Toggle italic" className="h-6 w-8 px-0">
-                                    <Italic className="h-3 w-3" />
-                                </ToggleGroupItem>
-                                <ToggleGroupItem value="underline" aria-label="Toggle underline" className="h-6 w-8 px-0">
-                                    <Underline className="h-3 w-3" />
-                                </ToggleGroupItem>
-                            </ToggleGroup>
-                        </div>
-
-                        <Separator />
-
-                        <div className="flex items-center space-x-2">
-                            <Checkbox
-                                id="hideText"
-                                checked={currentStyle.hideText || false}
-                                onCheckedChange={(checked) => updateStyle({ hideText: !!checked })}
-                            />
-                            <Label htmlFor="hideText" className="text-xs font-normal cursor-pointer">Hide Text Context</Label>
-                        </div>
-
-                        {renderColorPicker("Color", "textColor")}
-                    </div>
-                );
-
             case 'tempo':
-                return (
-                    <div className="space-y-4">
-                        <div className="space-y-2">
-                            <Label className="text-xs font-semibold">Style</Label>
-                            <ToggleGroup
-                                type="multiple"
-                                size="sm"
-                                className="justify-start border p-1 rounded-md"
-                                value={currentStyle.tempoModifiers || ['bold']}
-                                onValueChange={(val) => updateStyle({ tempoModifiers: val as ('bold' | 'italic' | 'underline')[] })}
-                            >
-                                <ToggleGroupItem value="bold" aria-label="Toggle bold" className="h-6 w-8 px-0">
-                                    <Bold className="h-3 w-3" />
-                                </ToggleGroupItem>
-                                <ToggleGroupItem value="italic" aria-label="Toggle italic" className="h-6 w-8 px-0">
-                                    <Italic className="h-3 w-3" />
-                                </ToggleGroupItem>
-                                <ToggleGroupItem value="underline" aria-label="Toggle underline" className="h-6 w-8 px-0">
-                                    <Underline className="h-3 w-3" />
-                                </ToggleGroupItem>
-                            </ToggleGroup>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label className="text-xs font-semibold">Override Text</Label>
-                            <Input
-                                className="h-8 text-xs"
-                                placeholder="ex. Allegro"
-                                value={currentStyle.tempoTextOverride || ''}
-                                onChange={(e) => updateStyle({ tempoTextOverride: e.target.value })}
-                            />
-                        </div>
-
-                        <Separator />
-
-                        <div className="flex items-center space-x-2">
-                            <Checkbox
-                                id="hideTempo"
-                                checked={currentStyle.hideTempo || false}
-                                onCheckedChange={(checked) => updateStyle({ hideTempo: !!checked })}
-                            />
-                            <Label htmlFor="hideTempo" className="text-xs font-normal cursor-pointer">Hide Tempo</Label>
-                        </div>
-
-                        {renderColorPicker("Color", "tempoColor")}
-                    </div>
-                );
-
+                return <GenericTextPanel type={activeSelection.type} style={currentStyle} updateStyle={updateStyle} />;
             case 'globalTitle':
             case 'globalSubtitle':
             case 'globalComposer':
             case 'globalArranger':
-            case 'globalCreatedBy': {
-                const globalKeyMap = {
-                    'globalTitle': { text: 'title', modifiers: 'titleModifiers', color: 'titleColor', hide: 'hideTitle', defaultModifiers: ['bold'] as ('bold' | 'italic' | 'underline')[] },
-                    'globalSubtitle': { text: 'subtitle', modifiers: 'subtitleModifiers', color: 'subtitleColor', hide: 'hideSubtitle', defaultModifiers: ['italic'] as ('bold' | 'italic' | 'underline')[] },
-                    'globalComposer': { text: 'composer', modifiers: 'composerModifiers', color: 'composerColor', hide: 'hideComposer', defaultModifiers: [] as ('bold' | 'italic' | 'underline')[] },
-                    'globalArranger': { text: 'arranger', modifiers: 'arrangerModifiers', color: 'arrangerColor', hide: 'hideArranger', defaultModifiers: ['italic'] as ('bold' | 'italic' | 'underline')[] },
-                    'globalCreatedBy': { text: 'createdBy', modifiers: 'createdByModifiers', color: 'createdByColor', hide: 'hideCreatedBy', defaultModifiers: ['italic'] as ('bold' | 'italic' | 'underline')[] }
-                } as const;
-
-                const mapping = globalKeyMap[activeSelection.type as keyof typeof globalKeyMap];
-
+            case 'globalCreatedBy':
                 return (
-                    <div className="space-y-4">
-                        <div className="space-y-2">
-                            <Label className="text-xs font-semibold">Style</Label>
-                            <ToggleGroup
-                                type="multiple"
-                                size="sm"
-                                className="justify-start border p-1 rounded-md"
-                                value={globalStyle[mapping.modifiers] || mapping.defaultModifiers}
-                                onValueChange={(val) => updateGlobalStyle({ [mapping.modifiers]: val as ('bold' | 'italic' | 'underline')[] })}
-                            >
-                                <ToggleGroupItem value="bold" aria-label="Toggle bold" className="h-6 w-8 px-0">
-                                    <Bold className="h-3 w-3" />
-                                </ToggleGroupItem>
-                                <ToggleGroupItem value="italic" aria-label="Toggle italic" className="h-6 w-8 px-0">
-                                    <Italic className="h-3 w-3" />
-                                </ToggleGroupItem>
-                                <ToggleGroupItem value="underline" aria-label="Toggle underline" className="h-6 w-8 px-0">
-                                    <Underline className="h-3 w-3" />
-                                </ToggleGroupItem>
-                            </ToggleGroup>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label className="text-xs font-semibold">Edit Text</Label>
-                            <Input
-                                className="h-8 text-xs"
-                                value={(composition as any)[mapping.text] || ''}
-                                onChange={(e) => updateGlobalText(mapping.text as keyof Composition, e.target.value)}
-                            />
-                        </div>
-
-                        <Separator />
-
-                        <div className="flex items-center space-x-2">
-                            <Checkbox
-                                id={mapping.hide}
-                                checked={globalStyle[mapping.hide] || false}
-                                onCheckedChange={(checked) => updateGlobalStyle({ [mapping.hide]: !!checked })}
-                            />
-                            <Label htmlFor={mapping.hide} className="text-xs font-normal cursor-pointer">Hide {activeSelection.type.replace('global', '').replace(/([A-Z])/g, ' $1').trim()}</Label>
-                        </div>
-
-                        {renderColorPicker("Color", mapping.color, true)}
-                    </div>
+                    <GlobalTextPanel
+                        type={activeSelection.type}
+                        composition={composition}
+                        style={globalStyle}
+                        updateStyle={updateGlobalStyle}
+                        updateText={updateGlobalText}
+                    />
                 );
-            }
-
             default:
                 return null;
         }
     };
 
+    if (!isMounted) return null;
+
     return (
-        <div style={popupStyle} ref={popoverRef} className="animate-in fade-in zoom-in-95 duration-200">
+        <div
+            ref={refs.setFloating}
+            style={{ ...floatingStyles, ...transitionStyles, zIndex: 50 }}
+        >
             <div className={`w-64 p-4 shadow-xl rounded-xl border bg-card text-card-foreground outline-none relative before:content-[''] before:absolute before:border-8 before:border-transparent ${arrowClasses}`}>
                 <button
                     className="absolute top-2 right-2 text-muted-foreground hover:bg-muted p-1 rounded-md"
