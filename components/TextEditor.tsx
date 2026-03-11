@@ -12,8 +12,9 @@ import { SettingsEditor } from './SettingsEditor';
 import CodeMirror from '@uiw/react-codemirror';
 
 export function TextEditor() {
-    const { rawText, setRawText, composition, updateCompositionAndSync, setComposition } = useStore();
+    const { rawText, setRawText, composition, updateCompositionAndSync, setComposition, showRawTextEditor } = useStore();
     const [localText, setLocalText] = useState(rawText);
+    const [activeTab, setActiveTab] = useState('form');
     const { theme, systemTheme } = useTheme();
 
     const currentTheme = theme === "system" ? systemTheme : theme;
@@ -43,26 +44,35 @@ export function TextEditor() {
         setLocalText(rawText);
     }, [rawText]);
 
+    // Prevent getting stuck on the editor tab if it is hidden
+    useEffect(() => {
+        if (!showRawTextEditor && activeTab === 'editor') {
+            setActiveTab('form');
+        }
+    }, [showRawTextEditor, activeTab]);
+
     return (
         <div className="flex flex-col h-full bg-muted/20 border-r border-border">
-            <Tabs defaultValue="form" className="flex flex-col h-full w-full">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
 
                 {/* Fixed Header & Tabs */}
                 <div className="p-4 border-b border-border bg-background">
                     <h2 className="text-xl font-semibold mb-4 text-foreground">OneSheet</h2>
-                    <TabsList className="grid w-full grid-cols-3 bg-muted p-1 rounded-lg h-10">
+                    <TabsList className={`grid w-full ${showRawTextEditor ? 'grid-cols-3' : 'grid-cols-2'} bg-muted p-1 rounded-lg h-10`}>
                         <TabsTrigger
                             value="form"
                             className="data-[state=active]:bg-background data-[state=active]:!text-foreground data-[state=active]:shadow-sm text-muted-foreground rounded-md !h-full transition-all text-xs"
                         >
                             Form Editor
                         </TabsTrigger>
-                        <TabsTrigger
-                            value="editor"
-                            className="data-[state=active]:bg-background data-[state=active]:!text-foreground data-[state=active]:shadow-sm text-muted-foreground rounded-md !h-full transition-all text-xs"
-                        >
-                            Text Editor
-                        </TabsTrigger>
+                        {showRawTextEditor && (
+                            <TabsTrigger
+                                value="editor"
+                                className="data-[state=active]:bg-background data-[state=active]:!text-foreground data-[state=active]:shadow-sm text-muted-foreground rounded-md !h-full transition-all text-xs"
+                            >
+                                Text Editor
+                            </TabsTrigger>
+                        )}
                         <TabsTrigger
                             value="settings"
                             className="data-[state=active]:bg-background data-[state=active]:!text-foreground data-[state=active]:shadow-sm text-muted-foreground rounded-md !h-full transition-all text-xs"

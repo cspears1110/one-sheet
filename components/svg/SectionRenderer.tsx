@@ -44,7 +44,7 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                 case '[s]': smuflCode = ' \uECA9'; break;
                 default: return <React.Fragment key={index}>{part}</React.Fragment>;
             }
-            return <tspan key={index} fontSize={22} fontFamily="var(--font-bravura-text)">{smuflCode}</tspan>;
+            return <tspan key={index} fontSize={22} style={{ fontFamily: 'var(--font-bravura-text)' }}>{smuflCode}</tspan>;
         });
     };
 
@@ -65,21 +65,21 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
             const lower = token.toLowerCase();
             if (lower === 'c' || lower === 'common') {
                 elements.push(
-                    <text key={i} x={currentX + 8} y={20} fill={fillC} fontSize={26} fontFamily="var(--font-bravura-text)" textAnchor="middle">
+                    <text key={i} x={currentX + 8} y={20} fill={fillC} fontSize={26} style={{ fontFamily: 'var(--font-bravura-text)' }} textAnchor="middle">
                         {'\uE08A'}
                     </text>
                 );
                 currentX += 16;
             } else if (lower === 'cut') {
                 elements.push(
-                    <text key={i} x={currentX + 8} y={20} fill={fillC} fontSize={26} fontFamily="var(--font-bravura-text)" textAnchor="middle">
+                    <text key={i} x={currentX + 8} y={20} fill={fillC} fontSize={26} style={{ fontFamily: 'var(--font-bravura-text)' }} textAnchor="middle">
                         {'\uE08B'}
                     </text>
                 );
                 currentX += 16;
             } else if (token === '+') {
                 elements.push(
-                    <text key={i} x={currentX + 6} y={20} fill={fillC} fontSize={20} fontFamily="var(--font-bravura-text)" textAnchor="middle">
+                    <text key={i} x={currentX + 6} y={20} fill={fillC} fontSize={20} style={{ fontFamily: 'var(--font-bravura-text)' }} textAnchor="middle">
                         {digitMap['+']}
                     </text>
                 );
@@ -105,7 +105,7 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                         localXOffset += cw; // Reserve its width exclusively
 
                         return (
-                            <text key={`${keyBase}-${index}`} x={charX} y={yPos} fill={fillC} fontSize={26} fontFamily="var(--font-bravura-text)" textAnchor="start">
+                            <text key={`${keyBase}-${index}`} x={charX} y={yPos} fill={fillC} fontSize={26} style={{ fontFamily: 'var(--font-bravura-text)' }} textAnchor="start">
                                 {digitMap[char] || char}
                             </text>
                         );

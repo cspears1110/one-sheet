@@ -23,6 +23,8 @@ export interface AppState {
     toggleCollapsedId: (id: string) => void;
     activeSelection: ActiveSelection;
     setActiveSelection: (selection: ActiveSelection) => void;
+    showRawTextEditor: boolean;
+    setShowRawTextEditor: (show: boolean) => void;
 }
 
 export const useStore = create<AppState>()(
@@ -80,6 +82,8 @@ export const useStore = create<AppState>()(
             }),
             activeSelection: { sectionId: null, type: 'none' },
             setActiveSelection: (selection) => set({ activeSelection: selection }),
+            showRawTextEditor: false,
+            setShowRawTextEditor: (show) => set({ showRawTextEditor: show }),
         }),
         {
             name: 'one-sheet-storage',

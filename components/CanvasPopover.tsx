@@ -319,9 +319,9 @@ export function CanvasPopover() {
                             {['2/2', '2/4', '3/4', '4/4', '6/8', '12/8', 'C', 'Cut'].map(ts => {
                                 let displayStr: React.ReactNode = ts;
                                 if (ts === 'C') {
-                                    displayStr = <svg width="40" height="40" className="text-current overflow-visible"><text x="20" y="26" fill="currentColor" fontSize={28} fontFamily="var(--font-bravura-text)" textAnchor="middle">{'\uE08A'}</text></svg>;
+                                    displayStr = <svg width="40" height="40" className="text-current overflow-visible"><text x="20" y="26" fill="currentColor" fontSize={28} style={{ fontFamily: 'var(--font-bravura-text)' }} textAnchor="middle">{'\uE08A'}</text></svg>;
                                 } else if (ts === 'Cut') {
-                                    displayStr = <svg width="40" height="40" className="text-current overflow-visible"><text x="20" y="26" fill="currentColor" fontSize={28} fontFamily="var(--font-bravura-text)" textAnchor="middle">{'\uE08B'}</text></svg>;
+                                    displayStr = <svg width="40" height="40" className="text-current overflow-visible"><text x="20" y="26" fill="currentColor" fontSize={28} style={{ fontFamily: 'var(--font-bravura-text)' }} textAnchor="middle">{'\uE08B'}</text></svg>;
                                 } else if (ts.includes('/')) {
                                     const digitMap: Record<string, string> = {
                                         '0': '\uE080', '1': '\uE081', '2': '\uE082', '3': '\uE083', '4': '\uE084',
@@ -338,7 +338,7 @@ export function CanvasPopover() {
                                             const charX = localXOffset;
                                             localXOffset += 8;
                                             return (
-                                                <text key={`${keyBase}-${index}`} x={charX} y={yPos} fill="currentColor" fontSize={28} fontFamily="var(--font-bravura-text)" textAnchor="start">
+                                                <text key={`${keyBase}-${index}`} x={charX} y={yPos} fill="currentColor" fontSize={28} style={{ fontFamily: 'var(--font-bravura-text)' }} textAnchor="start">
                                                     {digitMap[char] || char}
                                                 </text>
                                             );

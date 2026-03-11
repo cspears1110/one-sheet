@@ -3,10 +3,11 @@ import { useStore } from '../lib/store';
 import { PageSize, PageOrientation } from '../lib/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useTheme } from 'next-themes';
 
 export function SettingsEditor() {
-    const { pageConfig, setPageConfig } = useStore();
+    const { pageConfig, setPageConfig, showRawTextEditor, setShowRawTextEditor } = useStore();
     const { theme, setTheme } = useTheme();
 
     return (
@@ -56,6 +57,28 @@ export function SettingsEditor() {
                                 <TabsTrigger value="dark">Dark</TabsTrigger>
                             </TabsList>
                         </Tabs>
+                    </div>
+
+                    <div className="space-y-4 pt-4 border-t border-border">
+                        <label className="text-xs font-semibold text-muted-foreground block">Editor Settings</label>
+                        <div className="flex items-center space-x-2">
+                            <Checkbox
+                                id="show-raw-text"
+                                checked={showRawTextEditor}
+                                onCheckedChange={(checked) => setShowRawTextEditor(checked === true)}
+                            />
+                            <div className="grid gap-1.5 leading-none">
+                                <label
+                                    htmlFor="show-raw-text"
+                                    className="text-sm font-medium leading-none cursor-pointer"
+                                >
+                                    Enable Raw Text Editor
+                                </label>
+                                <p className="text-xs text-muted-foreground">
+                                    Show the advanced markdown text editor tab for direct coding.
+                                </p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
