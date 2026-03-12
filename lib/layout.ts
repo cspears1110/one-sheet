@@ -125,13 +125,17 @@ function calculateMinDimensions(section: Section, config: LayoutConfig, inferred
     
     // 1. Calculate Start Measure width (Left Aligned)
     let startMeasureFootprint = 0;
-    if (hasShape) {
-        startMeasureFootprint = Theme.layout.startMeasureShapeWidth;
-    } else if (!style.hideStartMeasure) {
+    if (!style.hideStartMeasure) {
         const smText = style.startMeasureTextOverride || section.startMeasure.toString();
-        // Use bold font measurement if applicable
         const font = style.startMeasureTextModifiers?.includes('bold') ? 'bold 12px sans-serif' : '12px sans-serif';
-        startMeasureFootprint = measureTextWidth(smText, font);
+        const textWidth = measureTextWidth(smText, font);
+
+        if (hasShape) {
+            // Shapes have a minimum baseline width and extra padding
+            startMeasureFootprint = Math.max(Theme.layout.startMeasureShapeWidth, textWidth + 12);
+        } else {
+            startMeasureFootprint = textWidth;
+        }
     }
 
     // 2. Calculate Measure Range width (Center Aligned)

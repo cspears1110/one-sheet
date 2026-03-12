@@ -2,6 +2,7 @@ import React from 'react';
 import { PositionedSection, calculateTimeSigGap, wrapText } from '../../lib/layout';
 import { useStore, ActiveSelectionType } from '../../lib/store';
 import { BravuraPaths } from '../../lib/bravura-paths';
+import { measureTextWidth } from '../../lib/measure-text';
 
 interface Props {
     positioned: PositionedSection;
@@ -324,35 +325,60 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
             )}
 
             {/* Start Measure Number Interactive Group */}
-            {!isFirstChild && (
-                <g
-                    className={`cursor-pointer group ${isSelected('startMeasure') ? 'text-blue-600' : ''} ${hideStartMeasure ? 'print:hidden' : ''}`}
-                    onClick={(e) => handleClick(e, 'startMeasure')}
-                    transform={(!isCurlyBrace && (currentStyle.startMeasureShape === 'circle' || currentStyle.startMeasureShape === 'square')) ? `translate(0, -8)` : undefined}
-                >
-                    <rect x={-4} y={isCurlyBrace ? -26 : -14} width={24} height={14} fill="transparent" />
+            {!isFirstChild && !hideStartMeasure && (() => {
+                const smText = currentStyle.startMeasureTextOverride || positioned.startMeasure.toString();
+                const smFont = (currentStyle.startMeasureTextModifiers || ['bold']).includes('bold') ? 'bold 12px sans-serif' : '12px sans-serif';
+                const smWidth = measureTextWidth(smText, smFont);
+                const hasShape = currentStyle.startMeasureShape === 'circle' || currentStyle.startMeasureShape === 'square';
+                const dynamicShapeWidth = hasShape ? Math.max(24, smWidth + 12) : smWidth;
+                const centerX = dynamicShapeWidth / 2;
 
-                    {currentStyle.startMeasureShape === 'circle' && (
-                        <circle cx={10} cy={isCurlyBrace ? -20 : -8} r={12} fill="white" stroke={isSelected('startMeasure') ? '#2563eb' : (hideStartMeasure ? '#d1d5db' : startMeasureColor)} strokeWidth={(currentStyle.startMeasureTextModifiers || ['bold']).includes('bold') ? 1.5 : 1} />
-                    )}
-                    {currentStyle.startMeasureShape === 'square' && (
-                        <rect x={-2} y={isCurlyBrace ? -32 : -20} width={24} height={24} fill="white" stroke={isSelected('startMeasure') ? '#2563eb' : (hideStartMeasure ? '#d1d5db' : startMeasureColor)} strokeWidth={(currentStyle.startMeasureTextModifiers || ['bold']).includes('bold') ? 1.5 : 1} />
-                    )}
-
-                    <text
-                        x={10}
-                        y={isCurlyBrace ? -16 : -4}
-                        fill={isSelected('startMeasure') ? '#2563eb' : (hideStartMeasure ? '#d1d5db' : startMeasureColor)}
-                        fontSize={12}
-                        fontFamily="sans-serif"
-                        textAnchor="middle"
-                        {...getFontStyle(currentStyle.startMeasureTextModifiers || ['bold'])}
-                        style={getFontStyle(currentStyle.startMeasureTextModifiers || ['bold'])}
+                return (
+                    <g
+                        className={`cursor-pointer group ${isSelected('startMeasure') ? 'text-blue-600' : ''}`}
+                        onClick={(e) => handleClick(e, 'startMeasure')}
+                        transform={(!isCurlyBrace && hasShape) ? `translate(0, -8)` : undefined}
                     >
-                        {currentStyle.startMeasureTextOverride || positioned.startMeasure}
-                    </text>
-                </g>
-            )}
+                        <rect x={-4} y={isCurlyBrace ? -26 : -14} width={dynamicShapeWidth + 8} height={14} fill="transparent" />
+
+                        {currentStyle.startMeasureShape === 'circle' && (
+                            <ellipse 
+                                cx={centerX} 
+                                cy={isCurlyBrace ? -20 : -8} 
+                                rx={dynamicShapeWidth / 2} 
+                                ry={12} 
+                                fill="white" 
+                                stroke={isSelected('startMeasure') ? '#2563eb' : (hideStartMeasure ? '#d1d5db' : startMeasureColor)} 
+                                strokeWidth={(currentStyle.startMeasureTextModifiers || ['bold']).includes('bold') ? 1.5 : 1} 
+                            />
+                        )}
+                        {currentStyle.startMeasureShape === 'square' && (
+                            <rect 
+                                x={0} 
+                                y={isCurlyBrace ? -32 : -20} 
+                                width={dynamicShapeWidth} 
+                                height={24} 
+                                fill="white" 
+                                stroke={isSelected('startMeasure') ? '#2563eb' : (hideStartMeasure ? '#d1d5db' : startMeasureColor)} 
+                                strokeWidth={(currentStyle.startMeasureTextModifiers || ['bold']).includes('bold') ? 1.5 : 1} 
+                            />
+                        )}
+
+                        <text
+                            x={centerX}
+                            y={isCurlyBrace ? -16 : -4}
+                            fill={isSelected('startMeasure') ? '#2563eb' : (hideStartMeasure ? '#d1d5db' : startMeasureColor)}
+                            fontSize={12}
+                            fontFamily="sans-serif"
+                            textAnchor="middle"
+                            {...getFontStyle(currentStyle.startMeasureTextModifiers || ['bold'])}
+                            style={getFontStyle(currentStyle.startMeasureTextModifiers || ['bold'])}
+                        >
+                            {smText}
+                        </text>
+                    </g>
+                );
+            })()}
 
             {/* Start and End Measure Range Interactive Group */}
             {measureCount > 0 && (() => {
