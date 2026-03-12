@@ -5,7 +5,6 @@ import { useStore } from '../lib/store';
 import { computeLayout, getLayoutConfig } from '../lib/layout';
 import { SectionRenderer } from './svg/SectionRenderer';
 import { HeaderRenderer } from './svg/HeaderRenderer';
-import { CanvasPopover } from './CanvasPopover';
 
 export function CanvasRenderer() {
     const { composition, pageConfig, activeSelection, setActiveSelection } = useStore();
@@ -163,9 +162,6 @@ export function CanvasRenderer() {
                     </g>
                 )}
             </svg>
-
-            {/* Popover overlay rendered in typical DOM layer */}
-            <CanvasPopover />
         </div >
     );
 }

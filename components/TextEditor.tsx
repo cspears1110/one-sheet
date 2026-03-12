@@ -9,10 +9,11 @@ import { useTheme } from 'next-themes';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FormEditor } from './FormEditor';
 import { SettingsEditor } from './SettingsEditor';
+import { Inspector } from './Inspector';
 import CodeMirror from '@uiw/react-codemirror';
 
 export function TextEditor() {
-    const { rawText, setRawText, composition, updateCompositionAndSync, setComposition, showRawTextEditor } = useStore();
+    const { rawText, setRawText, composition, updateCompositionAndSync, setComposition, showRawTextEditor, activeSelection } = useStore();
     const [localText, setLocalText] = useState(rawText);
     const [activeTab, setActiveTab] = useState('form');
     const { theme, systemTheme } = useTheme();
@@ -51,6 +52,13 @@ export function TextEditor() {
         }
     }, [showRawTextEditor, activeTab]);
 
+    // Auto-switch to Inspector tab when an item is selected
+    useEffect(() => {
+        if (activeSelection.type !== 'none' && activeSelection.sectionId !== null) {
+            setActiveTab('inspector');
+        }
+    }, [activeSelection.type, activeSelection.sectionId]);
+
     return (
         <div className="flex flex-col h-full bg-muted/20 border-r border-border">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
@@ -58,19 +66,28 @@ export function TextEditor() {
                 {/* Fixed Header & Tabs */}
                 <div className="p-4 border-b border-border bg-background">
                     <h2 className="text-xl font-semibold mb-4 text-foreground">OneSheet</h2>
-                    <TabsList className={`grid w-full ${showRawTextEditor ? 'grid-cols-3' : 'grid-cols-2'} bg-muted p-1 rounded-lg h-10`}>
+                    <TabsList className={`grid w-full ${showRawTextEditor ? 'grid-cols-4' : 'grid-cols-3'} bg-muted p-1 rounded-lg h-10`}>
                         <TabsTrigger
                             value="form"
                             className="data-[state=active]:bg-background data-[state=active]:!text-foreground data-[state=active]:shadow-sm text-muted-foreground rounded-md !h-full transition-all text-xs"
                         >
-                            Form Editor
+                            Form
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="inspector"
+                            className="relative data-[state=active]:bg-background data-[state=active]:!text-foreground data-[state=active]:shadow-sm text-muted-foreground rounded-md !h-full transition-all text-xs"
+                        >
+                            Inspector
+                            {activeSelection.type !== 'none' && (
+                                <span className="absolute top-1 right-1 w-2 h-2 bg-blue-500 rounded-full" title="Active selection" />
+                            )}
                         </TabsTrigger>
                         {showRawTextEditor && (
                             <TabsTrigger
                                 value="editor"
                                 className="data-[state=active]:bg-background data-[state=active]:!text-foreground data-[state=active]:shadow-sm text-muted-foreground rounded-md !h-full transition-all text-xs"
                             >
-                                Text Editor
+                                Text
                             </TabsTrigger>
                         )}
                         <TabsTrigger
@@ -123,6 +140,11 @@ export function TextEditor() {
                 {/* Settings View */}
                 <TabsContent value="settings" className="flex-1 flex flex-col m-0 p-4 data-[state=active]:flex overflow-y-auto w-full">
                     <SettingsEditor />
+                </TabsContent>
+
+                {/* Inspector View */}
+                <TabsContent value="inspector" className="flex-1 flex flex-col m-0 p-4 data-[state=active]:flex overflow-y-auto w-full">
+                    <Inspector />
                 </TabsContent>
 
             </Tabs>

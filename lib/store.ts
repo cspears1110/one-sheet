@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { produce } from 'immer';
 import { Composition, PageConfig, Section } from './types';
 import { serializeComposition } from './serializer';
 
@@ -16,8 +15,8 @@ export interface AppState {
     rawText: string;
     setRawText: (text: string) => void;
     composition: Composition;
-    setComposition: (updater: Composition | ((draft: Composition) => void | Composition)) => void;
-    updateCompositionAndSync: (updater: Composition | ((draft: Composition) => void | Composition)) => void;
+    setComposition: (updater: Composition | ((prev: Composition) => Composition)) => void;
+    updateCompositionAndSync: (updater: Composition | ((prev: Composition) => Composition)) => void;
     pageConfig: PageConfig;
     setPageConfig: (config: Partial<PageConfig>) => void;
     collapsedIds: string[];
@@ -55,10 +54,10 @@ export const useStore = create<AppState>()(
                 ]
             },
             setComposition: (updater) => set((state) => ({
-                composition: typeof updater === 'function' ? produce(state.composition, updater) : updater
+                composition: typeof updater === 'function' ? updater(state.composition) : updater
             })),
             updateCompositionAndSync: (updater) => set((state) => {
-                const nextComp = typeof updater === 'function' ? produce(state.composition, updater) : updater;
+                const nextComp = typeof updater === 'function' ? updater(state.composition) : updater;
                 const serialized = serializeComposition(nextComp);
                 return {
                     composition: nextComp,

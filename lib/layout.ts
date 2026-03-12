@@ -57,15 +57,20 @@ export function calculateTimeSigGap(timeSig?: string): number {
     if (!timeSig) return 0;
     const tokens = timeSig.trim().split(/\s+/);
     let gap = Theme.layout.timeSigBaseGap;
+    
+    // Slight padding for compounded signatures
+    if (tokens.length > 1) gap += 4;
+
     tokens.forEach(t => {
         const lower = t.toLowerCase();
-        if (lower === 'c' || lower === 'cut' || t === '+') gap += Theme.layout.timeSigCommonWaitGap;
-        else if (t.includes('/')) {
+        if (lower === 'c' || lower === 'cut' || t === '+') {
+            gap += Theme.layout.timeSigCommonWaitGap + 4;
+        } else if (t.includes('/')) {
             const parts = t.split('/');
             const getCharWidth = (c: string) => (c === '+' || c === '-') ? Theme.layout.charWidths.timeSigPlusMinus : Theme.layout.charWidths.timeSigDigit;
             const w1 = parts[0].split('').reduce((acc, c) => acc + getCharWidth(c), 0);
             const w2 = parts[1].split('').reduce((acc, c) => acc + getCharWidth(c), 0);
-            gap += Math.max(w1, w2) + 8;
+            gap += Math.max(w1, w2) + 6; // Tightened padding
         } else {
             gap += t.length * 8 + 4;
         }
@@ -114,31 +119,56 @@ export function wrapText(text: string, maxPixelWidth: number, font: string = '12
 
 // Helper to determine the minimum dimensions required for a section subtree
 function calculateMinDimensions(section: Section, config: LayoutConfig, inferredEnd?: number): { width: number; depth: number } {
-    const hasShape = section.style?.startMeasureShape === 'circle' || section.style?.startMeasureShape === 'square';
-    const startMeasureFootprint = hasShape ? Theme.layout.startMeasureShapeWidth : (section.startMeasure.toString().length * Theme.layout.charWidths.measureNumber);
-
-    const endM = section.endMeasure ?? inferredEnd ?? section.startMeasure;
-    const rangeStrWidth = section.showMeasureCount ?
-        ((endM - section.startMeasure + 1).toString().length * Theme.layout.charWidths.measureNumber) :
-        (`${section.startMeasure}-${endM}`.length * Theme.layout.charWidths.measureNumber);
-
-    // To prevent overlap: Left item ends at (4 + startMeasureFootprint + padding).
-    // Center item begins at (width / 2 - rangeStrWidth / 2).
-    // So: width / 2 >= 4 + startMeasureFootprint + padding + rangeStrWidth / 2
-    // width >= 2 * (4 + startMeasureFootprint + padding) + rangeStrWidth
-    const padding = Theme.layout.horizontalPadding;
-    const minMeasureTextWidth = 2 * (4 + startMeasureFootprint + padding) + rangeStrWidth;
-
-    // Ensure there's a minimum baseline width so tiny titles or measure counts don't get squished.
-    const titleText = section.title || '';
-    const textWidth = Math.max((titleText.length * Theme.layout.charWidths.title) + 40, 60, minMeasureTextWidth);
-
-    // Add additional width if there are annotations or tempo markings
-    const annotationsWidth = section.annotations.length > 0 ? 50 : 0;
-    const tempoWidth = section.tempo ? Math.max(section.tempo.length * Theme.layout.charWidths.tempo, 80) : 0;
+    const style = section.style || {};
+    const hasShape = style.startMeasureShape === 'circle' || style.startMeasureShape === 'square';
     const timeSigGap = calculateTimeSigGap(section.timeSignature);
+    
+    // 1. Calculate Start Measure width (Left Aligned)
+    let startMeasureFootprint = 0;
+    if (hasShape) {
+        startMeasureFootprint = Theme.layout.startMeasureShapeWidth;
+    } else if (!style.hideStartMeasure) {
+        const smText = style.startMeasureTextOverride || section.startMeasure.toString();
+        // Use bold font measurement if applicable
+        const font = style.startMeasureTextModifiers?.includes('bold') ? 'bold 12px sans-serif' : '12px sans-serif';
+        startMeasureFootprint = measureTextWidth(smText, font);
+    }
 
-    let selfMinWidth = Math.max(textWidth + annotationsWidth, tempoWidth, minMeasureTextWidth) + timeSigGap;
+    // 2. Calculate Measure Range width (Center Aligned)
+    let rangeStrWidth = 0;
+    const endM = section.endMeasure ?? inferredEnd ?? section.startMeasure;
+    if (!style.hideMeasureRange) {
+        const rangeText = style.measureRangeTextOverride || (section.showMeasureCount ? 
+            (endM - section.startMeasure + 1).toString() : 
+            `${section.startMeasure}-${endM}`);
+        
+        const font = style.measureRangeTextModifiers?.includes('bold') ? 'bold 11px sans-serif' : '11px sans-serif';
+        rangeStrWidth = measureTextWidth(rangeText, font);
+    }
+
+    // 3. Prevent Overlap Logic
+    // We have three things on the left competing for space: Start Measure, Time Signature, and the transition padding.
+    // Center item begins at (width / 2). 
+    // width / 2 >= Math.max(startMeasureOffset, timeSigGap) + rangeStrWidth / 2 + padding
+    const hPadding = Theme.layout.horizontalPadding;
+    const leftObstacle = Math.max(4 + startMeasureFootprint, timeSigGap) + hPadding;
+    const minMeasureTextWidth = 2 * leftObstacle + rangeStrWidth;
+
+    // 4. Calculate Title Width
+    const titleText = section.title || '';
+    const titleFont = style.titleModifiers?.includes('bold') ? 'bold 13px sans-serif' : '13px sans-serif';
+    const titleWidth = measureTextWidth(titleText, titleFont);
+
+    // Title is pushed by time signature in the renderer
+    const titleRequirement = timeSigGap + titleWidth + 20;
+
+    // 5. Add additional width for annotations and tempo
+    const annotationsWidth = section.annotations.length > 0 ? 50 : 0;
+    const tempoFont = style.tempoModifiers?.includes('bold') ? 'bold 12px sans-serif' : '12px sans-serif';
+    const tempoWidth = section.tempo ? measureTextWidth(style.tempoTextOverride || section.tempo, tempoFont) + 20 : 0;
+
+    let selfMinWidth = Math.max(titleRequirement + annotationsWidth, tempoWidth, minMeasureTextWidth, 60);
+
 
     // Expand width if there is descriptive text.
     // We allow descriptive text to expand up to config.baseSectionWidth, or more if it's a single long un-wrappable word.
