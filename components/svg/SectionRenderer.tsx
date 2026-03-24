@@ -9,9 +9,10 @@ interface Props {
     level?: number;
     isFirstChild?: boolean;
     isLastChild?: boolean;
+    skipStartBarline?: boolean;
 }
 
-export function SectionRenderer({ positioned, level = 1, isFirstChild = false, isLastChild = true }: Props) {
+export function SectionRenderer({ positioned, level = 1, isFirstChild = false, isLastChild = true, skipStartBarline = false }: Props) {
     const { section, x, y, width } = positioned;
     const { activeSelection, setActiveSelection } = useStore();
 
@@ -224,12 +225,18 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
     const textColor = currentStyle.textColor || '#6b7280';
     const tempoColor = currentStyle.tempoColor || 'black';
 
+    const startBarlineColor = currentStyle.startBarlineColor || color;
+    const endBarlineColor = currentStyle.endBarlineColor || color;
+
     const hideStartMeasure = currentStyle.hideStartMeasure || false;
     const hideMeasureRange = currentStyle.hideMeasureRange || false;
     const hideBrace = currentStyle.hideBrace || false;
     const hideTitle = currentStyle.hideTitle || false;
     const hideText = currentStyle.hideText || false;
     const hideTempo = currentStyle.hideTempo || false;
+
+    const hideStartBarline = currentStyle.hideStartBarline || false;
+    const hideEndBarline = currentStyle.hideEndBarline || false;
 
     // Mathematical curve padding for the curly brace SVG Path.
     const curve = Math.min(10, width / 4);
@@ -265,6 +272,51 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                 {braceElement}
             </g>
         );
+    };
+
+    const renderBarline = (shape: string | undefined, xPos: number, height: number, strokeColor: string, isStart: boolean) => {
+        const shapeType = shape || 'single';
+        if (shapeType === 'invisible' || shapeType === 'none') return null;
+
+        const elements = [];
+        const yTop = braceHeight;
+        const yBottom = height;
+
+        if (shapeType === 'single') {
+            elements.push(<line key="1" x1={xPos} y1={yTop} x2={xPos} y2={yBottom} stroke={strokeColor} strokeWidth={1} />);
+        } else if (shapeType === 'dashed') {
+            elements.push(<line key="1" x1={xPos} y1={yTop} x2={xPos} y2={yBottom} stroke={strokeColor} strokeWidth={1} strokeDasharray="4 4" />);
+        } else if (shapeType === 'double') {
+            elements.push(<line key="1" x1={xPos - 1.5} y1={yTop} x2={xPos - 1.5} y2={yBottom} stroke={strokeColor} strokeWidth={1} />);
+            elements.push(<line key="2" x1={xPos + 1.5} y1={yTop} x2={xPos + 1.5} y2={yBottom} stroke={strokeColor} strokeWidth={1} />);
+        } else if (shapeType === 'end') {
+            // Always thin on left, thick on right for a final barline
+            elements.push(<line key="thin" x1={xPos - 2} y1={yTop} x2={xPos - 2} y2={yBottom} stroke={strokeColor} strokeWidth={1} />);
+            elements.push(<line key="thick" x1={xPos + 2} y1={yTop} x2={xPos + 2} y2={yBottom} stroke={strokeColor} strokeWidth={3} />);
+        } else if (shapeType === 'repeat-start') {
+            elements.push(<line key="thick" x1={xPos - 2} y1={yTop} x2={xPos - 2} y2={yBottom} stroke={strokeColor} strokeWidth={3} />);
+            elements.push(<line key="thin" x1={xPos + 2} y1={yTop} x2={xPos + 2} y2={yBottom} stroke={strokeColor} strokeWidth={1} />);
+            const midY = yTop + (yBottom - yTop) / 2;
+            elements.push(<circle key="d1" cx={xPos + 8} cy={midY - 4} r={2} fill={strokeColor} />);
+            elements.push(<circle key="d2" cx={xPos + 8} cy={midY + 4} r={2} fill={strokeColor} />);
+        } else if (shapeType === 'repeat-end') {
+            elements.push(<line key="thin" x1={xPos - 2} y1={yTop} x2={xPos - 2} y2={yBottom} stroke={strokeColor} strokeWidth={1} />);
+            elements.push(<line key="thick" x1={xPos + 2} y1={yTop} x2={xPos + 2} y2={yBottom} stroke={strokeColor} strokeWidth={3} />);
+            const midY = yTop + (yBottom - yTop) / 2;
+            elements.push(<circle key="d1" cx={xPos - 8} cy={midY - 4} r={2} fill={strokeColor} />);
+            elements.push(<circle key="d2" cx={xPos - 8} cy={midY + 4} r={2} fill={strokeColor} />);
+        } else if (shapeType === 'double-repeat') {
+            elements.push(<line key="thin1" x1={xPos - 4} y1={yTop} x2={xPos - 4} y2={yBottom} stroke={strokeColor} strokeWidth={1} />);
+            elements.push(<line key="thick" x1={xPos} y1={yTop} x2={xPos} y2={yBottom} stroke={strokeColor} strokeWidth={3} />);
+            elements.push(<line key="thin2" x1={xPos + 4} y1={yTop} x2={xPos + 4} y2={yBottom} stroke={strokeColor} strokeWidth={1} />);
+            const midY = yTop + (yBottom - yTop) / 2;
+            elements.push(<circle key="d1" cx={xPos - 8} cy={midY - 4} r={2} fill={strokeColor} />);
+            elements.push(<circle key="d2" cx={xPos - 8} cy={midY + 4} r={2} fill={strokeColor} />);
+            elements.push(<circle key="d3" cx={xPos + 8} cy={midY - 4} r={2} fill={strokeColor} />);
+            elements.push(<circle key="d4" cx={xPos + 8} cy={midY + 4} r={2} fill={strokeColor} />);
+        }
+
+        return <>{elements}</>;
     };
 
     const getFontStyle = (modifiers: string[] | undefined) => {
@@ -342,25 +394,25 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                         <rect x={-4} y={isCurlyBrace ? -26 : -14} width={dynamicShapeWidth + 8} height={14} fill="transparent" />
 
                         {currentStyle.startMeasureShape === 'circle' && (
-                            <ellipse 
-                                cx={centerX} 
-                                cy={isCurlyBrace ? -20 : -8} 
-                                rx={dynamicShapeWidth / 2} 
-                                ry={12} 
-                                fill="white" 
-                                stroke={isSelected('startMeasure') ? '#2563eb' : (hideStartMeasure ? '#d1d5db' : startMeasureColor)} 
-                                strokeWidth={(currentStyle.startMeasureTextModifiers || ['bold']).includes('bold') ? 1.5 : 1} 
+                            <ellipse
+                                cx={centerX}
+                                cy={isCurlyBrace ? -20 : -8}
+                                rx={dynamicShapeWidth / 2}
+                                ry={12}
+                                fill="white"
+                                stroke={isSelected('startMeasure') ? '#2563eb' : (hideStartMeasure ? '#d1d5db' : startMeasureColor)}
+                                strokeWidth={(currentStyle.startMeasureTextModifiers || ['bold']).includes('bold') ? 1.5 : 1}
                             />
                         )}
                         {currentStyle.startMeasureShape === 'square' && (
-                            <rect 
-                                x={0} 
-                                y={isCurlyBrace ? -32 : -20} 
-                                width={dynamicShapeWidth} 
-                                height={24} 
-                                fill="white" 
-                                stroke={isSelected('startMeasure') ? '#2563eb' : (hideStartMeasure ? '#d1d5db' : startMeasureColor)} 
-                                strokeWidth={(currentStyle.startMeasureTextModifiers || ['bold']).includes('bold') ? 1.5 : 1} 
+                            <rect
+                                x={0}
+                                y={isCurlyBrace ? -32 : -20}
+                                width={dynamicShapeWidth}
+                                height={24}
+                                fill="white"
+                                stroke={isSelected('startMeasure') ? '#2563eb' : (hideStartMeasure ? '#d1d5db' : startMeasureColor)}
+                                strokeWidth={(currentStyle.startMeasureTextModifiers || ['bold']).includes('bold') ? 1.5 : 1}
                             />
                         )}
 
@@ -405,12 +457,20 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                 );
             })()}
 
-            {/* Vertical Section Divider (solid black line per reference image) */}
-            <line x1={0} y1={braceHeight} x2={0} y2={positioned.subtreeHeight} stroke={color} strokeWidth={1} />
+            {/* Vertical Section Divider */}
+            {!skipStartBarline && (
+                <g className={`cursor-pointer group ${hideStartBarline ? 'print:hidden' : ''}`} onClick={(e) => handleClick(e, 'startBarline')}>
+                    <rect x={-8} y={braceHeight} width={16} height={positioned.subtreeHeight - braceHeight} fill="transparent" />
+                    {renderBarline(currentStyle.startBarlineShape, 0, positioned.subtreeHeight, isSelected('startBarline') ? '#2563eb' : (hideStartBarline ? '#d1d5db' : startBarlineColor), true)}
+                </g>
+            )}
 
             {/* Draw closing right-hand line for the very last child of a component tree */}
-            {isLastChild && (
-                <line x1={width} y1={braceHeight} x2={width} y2={positioned.subtreeHeight} stroke={color} strokeWidth={1} />
+            {isLastChild && level === 1 && (
+                <g className={`cursor-pointer group ${hideEndBarline ? 'print:hidden' : ''}`} onClick={(e) => handleClick(e, 'endBarline')}>
+                    <rect x={width - 8} y={braceHeight} width={16} height={positioned.subtreeHeight - braceHeight} fill="transparent" />
+                    {renderBarline(currentStyle.endBarlineShape, width, positioned.subtreeHeight, isSelected('endBarline') ? '#2563eb' : (hideEndBarline ? '#d1d5db' : endBarlineColor), false)}
+                </g>
             )}
 
             {/* Time Signature Interactive Group */}
@@ -471,9 +531,19 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
             )}
 
             {/* Render children recursively using the pre-calculated positioning */}
-            {positioned.children.map((child, index) => (
-                <SectionRenderer key={child.section.id} positioned={child} level={level + 1} isFirstChild={index === 0} isLastChild={isLastChild && index === positioned.children.length - 1} />
-            ))}
+            {positioned.children.map((child, index) => {
+                const childSkipStart = child.section.startMeasure === section.startMeasure;
+                return (
+                    <SectionRenderer
+                        key={child.section.id}
+                        positioned={child}
+                        level={level + 1}
+                        isFirstChild={index === 0}
+                        isLastChild={isLastChild && index === positioned.children.length - 1}
+                        skipStartBarline={childSkipStart}
+                    />
+                );
+            })}
         </g>
     );
 }

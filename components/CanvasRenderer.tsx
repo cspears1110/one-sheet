@@ -130,8 +130,13 @@ export function CanvasRenderer() {
                 <g transform={`translate(${offsetX}, 120) scale(${scale})`}>
                     {layoutStaves.map((staff) => (
                         <g key={staff.id} transform={`translate(0, ${staff.y})`}>
-                            {staff.sections.map(positioned => (
-                                <SectionRenderer key={positioned.section.id} positioned={positioned} level={1} />
+                            {staff.sections.map((positioned, index) => (
+                                <SectionRenderer
+                                    key={positioned.section.id}
+                                    positioned={positioned}
+                                    level={1}
+                                    isLastChild={index === staff.sections.length - 1}
+                                />
                             ))}
                         </g>
                     ))}

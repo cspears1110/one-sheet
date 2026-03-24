@@ -41,6 +41,15 @@ export interface SectionStyle {
   tempoTextOverride?: string;
   tempoColor?: string;
   hideTempo?: boolean;
+
+  // Barlines
+  startBarlineShape?: 'single' | 'double' | 'dashed' | 'end' | 'repeat-start' | 'repeat-end' | 'double-repeat';
+  startBarlineColor?: string;
+  hideStartBarline?: boolean;
+
+  endBarlineShape?: 'single' | 'double' | 'dashed' | 'end' | 'repeat-start' | 'repeat-end' | 'double-repeat';
+  endBarlineColor?: string;
+  hideEndBarline?: boolean;
 }
 
 export interface Section {

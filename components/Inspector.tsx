@@ -11,6 +11,7 @@ import {
 } from './popover/SectionSettingsPanels';
 import { TimeSignaturePanel } from './popover/TimeSignaturePanel';
 import { GlobalTextPanel } from './popover/GlobalTextPanel';
+import { BarlinePanel } from './popover/BarlinePanel';
 
 export function Inspector() {
     const { composition, activeSelection, setActiveSelection, updateCompositionAndSync } = useStore();
@@ -129,6 +130,9 @@ export function Inspector() {
                         }}
                     />
                 );
+            case 'startBarline':
+            case 'endBarline':
+                return <BarlinePanel type={activeSelection.type} style={currentStyle} updateStyle={updateStyle} />;
             case 'brace':
                 return <BracePanel style={currentStyle} effectiveBraceShape={effectiveBraceShape} updateStyle={updateStyle} />;
             case 'title':
