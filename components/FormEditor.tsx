@@ -29,6 +29,7 @@ import {
 
 import { FlattenedItem, flattenTree, buildTreeFromFlatWithDepth } from '../lib/tree-utils';
 import { SectionCard } from './SectionCard';
+import { SkeletonGenerator } from './SkeletonGenerator';
 
 export function FormEditor() {
     const { composition, updateCompositionAndSync, collapsedIds, toggleCollapsedId } = useStore();
@@ -435,7 +436,10 @@ export function FormEditor() {
             </Accordion>
 
             <div>
-                <h3 className="font-semibold text-sm text-foreground mb-3 ml-1">Sections</h3>
+                <div className="flex items-center justify-between mb-3 pr-2">
+                    <h3 className="font-semibold text-sm text-foreground ml-1">Sections</h3>
+                    <SkeletonGenerator />
+                </div>
 
                 <div className="flex flex-col mb-3 pl-2">
                     {visibleItems.map((item, index) => {

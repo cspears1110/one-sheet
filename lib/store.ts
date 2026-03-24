@@ -25,6 +25,7 @@ export interface AppState {
     setActiveSelection: (selection: ActiveSelection) => void;
     showRawTextEditor: boolean;
     setShowRawTextEditor: (show: boolean) => void;
+    generateSequence: (rows: { mark: string; start: number }[], mode: 'append' | 'replace') => void;
 }
 
 export const useStore = create<AppState>()(
@@ -84,6 +85,45 @@ export const useStore = create<AppState>()(
             setActiveSelection: (selection) => set({ activeSelection: selection }),
             showRawTextEditor: false,
             setShowRawTextEditor: (show) => set({ showRawTextEditor: show }),
+            generateSequence: (rows, mode) => set((state) => {
+                const newSections: Section[] = rows.map((row, i) => {
+                    const nextRow = rows[i+1];
+                    const endMeasure = nextRow && nextRow.start > row.start ? nextRow.start - 1 : undefined;
+                    return {
+                        id: `section-${Date.now()}-${i}`,
+                        title: '',
+                        editorLabel: row.mark,
+                        startMeasure: row.start,
+                        endMeasure,
+                        showMeasureCount: false,
+                        subSections: [],
+                        annotations: [],
+                        style: row.mark.trim() ? {
+                            startMeasureTextOverride: row.mark,
+                            startMeasureShape: 'square',
+                            startMeasureTextModifiers: ['bold']
+                        } : {}
+                    };
+                });
+                
+                let nextSections: Section[];
+                if (mode === 'replace') {
+                    nextSections = newSections;
+                } else {
+                    nextSections = [...state.composition.sections, ...newSections];
+                }
+                
+                const nextComp = {
+                    ...state.composition,
+                    sections: nextSections
+                };
+                
+                const serialized = serializeComposition(nextComp);
+                return {
+                    composition: nextComp,
+                    rawText: serialized
+                };
+            }),
         }),
         {
             name: 'one-sheet-storage',
