@@ -17,11 +17,24 @@ export function AnnotationPanel({ annotation, onUpdate, onDelete }: AnnotationPa
     return (
         <div className="space-y-4">
             <div className="flex items-start justify-between">
-                <ColorPicker
-                    label="Color"
-                    value={annotation.color}
-                    onChange={(color) => onUpdate({ color })}
-                />
+                {annotation.type !== 'image' ? (
+                    <ColorPicker
+                        label="Color"
+                        value={annotation.color}
+                        onChange={(color) => onUpdate({ color })}
+                    />
+                ) : (
+                    <div className="space-y-2 flex-1">
+                        <Label className="text-xs font-semibold">Image Preview</Label>
+                        <div className="border rounded-md overflow-hidden bg-muted/30 aspect-video flex items-center justify-center p-2 mt-2">
+                            <img 
+                                src={annotation.src} 
+                                alt="Annotation preview" 
+                                className="max-w-full max-h-full object-contain shadow-sm"
+                            />
+                        </div>
+                    </div>
+                )}
                 <Button 
                     variant="ghost" 
                     size="icon" 

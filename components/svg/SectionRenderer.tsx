@@ -821,6 +821,62 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                         </g>
                     );
                 }
+
+                if (ann.type === 'image' && ann.src) {
+                    let currentScaleVal = ann.scale !== undefined ? ann.scale : 1;
+                    const ar = ann.aspectRatio || 1;
+
+                    if (resizingAnnotation?.id === ann.id) {
+                        const deltaScale = resizeDragOffset.dy * 0.015;
+                        currentScaleVal = Math.max(0.1, Math.min(10, resizeStartScale + deltaScale));
+                    }
+
+                    const baseWidth = 100;
+                    const w = baseWidth * currentScaleVal;
+                    const h = (baseWidth / ar) * currentScaleVal;
+                    const pad = 4;
+                    const drawX = -pad;
+                    const drawY = -pad;
+                    const drawWidth = w + (pad * 2);
+                    const drawHeight = h + (pad * 2);
+
+                    return (
+                        <g
+                            key={ann.id}
+                            className={`cursor-move ${ann.hidden ? 'opacity-30 print:hidden' : ''}`}
+                            transform={`translate(${currentOffsetX}, ${currentOffsetY})`}
+                            onPointerDown={(e) => handleAnnotationPointerDown(e, ann.id)}
+                            onPointerMove={handleAnnotationPointerMove}
+                            onPointerUp={(e) => handleAnnotationPointerUp(e, ann.id)}
+                            onPointerCancel={(e) => handleAnnotationPointerUp(e, ann.id)}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            {isSelectedAnn && (
+                                <rect x={drawX} y={drawY} width={drawWidth} height={drawHeight} fill="transparent" stroke="#3b82f6" strokeWidth={1} strokeDasharray="2,2" />
+                            )}
+                            <rect x={drawX} y={drawY} width={drawWidth} height={drawHeight} fill="transparent" />
+                            <image href={ann.src} width={w} height={h} preserveAspectRatio="none" />
+                            
+                            {/* Resize Handle */}
+                            {isSelectedAnn && (
+                                <rect
+                                    x={drawX + drawWidth - 3}
+                                    y={drawY + drawHeight - 3}
+                                    width={6}
+                                    height={6}
+                                    fill="white"
+                                    stroke="#3b82f6"
+                                    strokeWidth={1}
+                                    className="cursor-nwse-resize print:hidden"
+                                    onPointerDown={(e) => handleResizePointerDown(e, ann.id, currentScaleVal, ann.type)}
+                                    onPointerMove={handleResizePointerMove}
+                                    onPointerUp={(e) => handleResizePointerUp(e, ann.id)}
+                                    onPointerCancel={(e) => handleResizePointerUp(e, ann.id)}
+                                />
+                            )}
+                        </g>
+                    );
+                }
                 
                 return null;
             })}

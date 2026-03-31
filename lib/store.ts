@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Composition, PageConfig, Section } from './types';
 import { serializeComposition } from './serializer';
+import { v4 as uuidv4 } from 'uuid';
 
 export type ActiveSelectionType = 'none' | 'startMeasure' | 'measureRange' | 'timeSignature' | 'brace' | 'title' | 'text' | 'tempo' | 'startBarline' | 'endBarline' | 'globalTitle' | 'globalSubtitle' | 'globalComposer' | 'globalArranger' | 'globalCreatedBy' | 'annotation';
 
@@ -27,6 +28,8 @@ export interface AppState {
     showRawTextEditor: boolean;
     setShowRawTextEditor: (show: boolean) => void;
     generateSequence: (rows: { mark: string; start: number }[], mode: 'append' | 'replace', finalMeasure?: number) => void;
+    addToGallery: (src: string, aspectRatio: number) => void;
+    removeFromGallery: (id: string) => void;
 }
 
 export const useStore = create<AppState>()(
@@ -125,6 +128,29 @@ export const useStore = create<AppState>()(
                     sections: nextSections
                 };
                 
+                const serialized = serializeComposition(nextComp);
+                return {
+                    composition: nextComp,
+                    rawText: serialized
+                };
+            }),
+            addToGallery: (src, aspectRatio) => set((state) => {
+                const newItem = { id: uuidv4(), src, aspectRatio };
+                const nextComp = {
+                    ...state.composition,
+                    imageGallery: [...(state.composition.imageGallery || []), newItem]
+                };
+                const serialized = serializeComposition(nextComp);
+                return {
+                    composition: nextComp,
+                    rawText: serialized
+                };
+            }),
+            removeFromGallery: (id) => set((state) => {
+                const nextComp = {
+                    ...state.composition,
+                    imageGallery: (state.composition.imageGallery || []).filter(item => item.id !== id)
+                };
                 const serialized = serializeComposition(nextComp);
                 return {
                     composition: nextComp,

@@ -8,9 +8,17 @@ import { Section, Annotation } from '../lib/types';
 import { v4 as uuidv4 } from 'uuid';
 import { SectionRenderer } from './svg/SectionRenderer';
 import { HeaderRenderer } from './svg/HeaderRenderer';
+import { processImageFile } from '../lib/image-utils';
 
 export function CanvasRenderer() {
-    const { composition, pageConfig, activeSelection, setActiveSelection, updateCompositionAndSync } = useStore();
+    const { 
+        composition, 
+        pageConfig, 
+        activeSelection, 
+        setActiveSelection, 
+        updateCompositionAndSync,
+        addToGallery 
+    } = useStore();
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -138,25 +146,26 @@ export function CanvasRenderer() {
         e.preventDefault(); // Necessary to allow dropping
     };
 
-    const handleDrop = (e: React.DragEvent<SVGSVGElement>) => {
+    const handleDrop = async (e: React.DragEvent<SVGSVGElement>) => {
         e.preventDefault();
+        
+        // Capture event data immediately before any async gap
+        const clientX = e.clientX;
+        const clientY = e.clientY;
+        const svgElement = e.currentTarget;
+        const files = e.dataTransfer.files;
         const data = e.dataTransfer.getData('application/json');
-        if (!data) return;
 
-        try {
-            const payload = JSON.parse(data);
-            if (payload.type !== 'new-annotation') return;
+        const findClosest = (cx: number, cy: number, element: SVGSVGElement) => {
+            const pt = element.createSVGPoint();
+            pt.x = cx;
+            pt.y = cy;
 
-            const svgElement = e.currentTarget;
-            const pt = svgElement.createSVGPoint();
-            pt.x = e.clientX;
-            pt.y = e.clientY;
-
-            const stavesGroup = svgElement.getElementById('logical-staves-group') as SVGGElement | null;
-            if (!stavesGroup) return;
+            const stavesGroup = element.getElementById('logical-staves-group') as SVGGElement | null;
+            if (!stavesGroup) return null;
 
             const matrix = stavesGroup.getScreenCTM()?.inverse();
-            if (!matrix) return;
+            if (!matrix) return null;
 
             const localPt = pt.matrixTransform(matrix);
 
@@ -164,10 +173,10 @@ export function CanvasRenderer() {
             let minDistance = Infinity;
             let closestAbsY = 0;
 
-            const allPositioned: { section: PositionedSection, absY: number }[] = [];
-            layoutStaves.forEach(staff => {
+            const allPositioned: { section: PositionedSection; absY: number }[] = [];
+            layoutStaves.forEach((staff) => {
                 const addSections = (secs: PositionedSection[], parentY: number) => {
-                    secs.forEach(s => {
+                    secs.forEach((s) => {
                         const absY = parentY + s.y;
                         allPositioned.push({ section: s, absY });
                         addSections(s.children, absY);
@@ -176,13 +185,13 @@ export function CanvasRenderer() {
                 addSections(staff.sections, staff.y);
             });
 
-            if (allPositioned.length === 0) return;
+            if (allPositioned.length === 0) return null;
 
             for (const item of allPositioned) {
                 const { section: s, absY } = item;
-                const centerX = s.x + (s.width / 2);
-                const centerY = absY + (s.height / 2);
-                
+                const centerX = s.x + s.width / 2;
+                const centerY = absY + s.height / 2;
+
                 const dx = localPt.x - centerX;
                 const dy = localPt.y - centerY;
                 const dist = dx * dx + dy * dy;
@@ -195,21 +204,87 @@ export function CanvasRenderer() {
             }
 
             if (closestSection) {
-                const relativeX = localPt.x - closestSection.x;
-                const relativeY = localPt.y - closestAbsY;
+                return {
+                    closestSection,
+                    relativeX: localPt.x - closestSection.x,
+                    relativeY: localPt.y - closestAbsY
+                };
+            }
+            return null;
+        };
+
+        // 1. Handle External File Drop (Desktop -> Browser)
+        if (files && files.length > 0) {
+            const file = files[0];
+            if (file.type.startsWith('image/')) {
+                try {
+                    const { src, aspectRatio } = await processImageFile(file);
+                    const result = findClosest(clientX, clientY, svgElement);
+                    
+                    if (result) {
+                        const { closestSection, relativeX, relativeY } = result;
+                        
+                        // Add to persistent gallery
+                        addToGallery(src, aspectRatio);
+
+                        const newAnn: Annotation = {
+                            id: uuidv4(),
+                            type: 'image',
+                            value: 'photo',
+                            offset: { x: relativeX, y: relativeY },
+                            src,
+                            aspectRatio,
+                            scale: 0.5
+                        };
+
+                        updateCompositionAndSync((prev) => {
+                            const updateSec = (sections: Section[]): Section[] => {
+                                return sections.map((sec) => {
+                                    if (sec.id === closestSection.section.id) {
+                                        return { ...sec, annotations: [...sec.annotations, newAnn] };
+                                    }
+                                    if (sec.subSections.length > 0) {
+                                        return { ...sec, subSections: updateSec(sec.subSections) };
+                                    }
+                                    return sec;
+                                });
+                            };
+                            return { ...prev, sections: updateSec(prev.sections) };
+                        });
+
+                        setActiveSelection({ sectionId: closestSection.section.id, type: 'annotation', annotationId: newAnn.id });
+                    }
+                } catch (err) {
+                    console.error("External file drop failed", err);
+                }
+            }
+            return;
+        }
+
+        // 2. Handle Internal Drag-and-Drop (Sidebar -> Canvas)
+        try {
+            if (!data) return;
+
+            const payload = JSON.parse(data);
+            if (payload.type !== 'new-annotation') return;
+
+            const result = findClosest(clientX, clientY, svgElement);
+            if (result) {
+                const { closestSection, relativeX, relativeY } = result;
 
                 const newAnn: Annotation = {
                     id: uuidv4(),
                     type: payload.annotationType || 'dynamic',
                     value: payload.value,
                     offset: { x: relativeX, y: relativeY },
+                    ...(payload.extra || {}),
                     ...(payload.annotationType === 'line' ? { width: 50, scale: 1 } : {})
                 };
 
-                updateCompositionAndSync(prev => {
+                updateCompositionAndSync((prev) => {
                     const updateSec = (sections: Section[]): Section[] => {
-                        return sections.map(sec => {
-                            if (sec.id === closestSection!.section.id) {
+                        return sections.map((sec) => {
+                            if (sec.id === closestSection.section.id) {
                                 return { ...sec, annotations: [...sec.annotations, newAnn] };
                             }
                             if (sec.subSections.length > 0) {
@@ -220,7 +295,7 @@ export function CanvasRenderer() {
                     };
                     return { ...prev, sections: updateSec(prev.sections) };
                 });
-                
+
                 setActiveSelection({ sectionId: closestSection.section.id, type: 'annotation', annotationId: newAnn.id });
             }
         } catch (err) {

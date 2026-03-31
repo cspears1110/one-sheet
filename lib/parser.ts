@@ -9,6 +9,7 @@ export interface ParsedComposition {
     arranger: string;
     createdBy: string;
     sections: Section[];
+    imageGallery: { id: string; src: string; aspectRatio: number }[];
 }
 
 export function parseCompositionText(text: string): ParsedComposition {
@@ -21,6 +22,7 @@ export function parseCompositionText(text: string): ParsedComposition {
     let composer = '';
     let arranger = '';
     let createdBy = '';
+    const imageGallery: { id: string; src: string; aspectRatio: number }[] = [];
 
     for (const line of lines) {
         // Metadata parsing (e.g. "Title: Symphony No. 5")
@@ -33,6 +35,16 @@ export function parseCompositionText(text: string): ParsedComposition {
             if (key === 'composer') composer = val;
             if (key === 'arranger' || key === 'transcriber') arranger = val;
             if (key === 'created by') createdBy = val;
+            continue;
+        }
+        
+        // Asset Parsing (for Gallery)
+        const assetMatch = line.match(/^[ \t]*Asset:\s*(.*)$/i);
+        if (assetMatch) {
+            try {
+                const asset = JSON.parse(assetMatch[1].trim());
+                imageGallery.push(asset);
+            } catch (e) {}
             continue;
         }
 
@@ -167,5 +179,5 @@ export function parseCompositionText(text: string): ParsedComposition {
         stack.push({ section: newSection, level });
     }
 
-    return { title, subtitle, composer, arranger, createdBy, sections };
+    return { title, subtitle, composer, arranger, createdBy, sections, imageGallery };
 }

@@ -5,9 +5,12 @@ import { v4 as uuidv4 } from 'uuid';
 import { Button } from '@/components/ui/button';
 import { SmuflSymbol } from './svg/SmuflComponents';
 import { BravuraPaths } from '../lib/bravura-paths';
+import { Image as ImageIcon, Upload, Trash2 } from 'lucide-react';
+import { processImageFile } from '../lib/image-utils';
 
 export function AnnotationsEditor() {
-    const { composition, updateCompositionAndSync, activeSelection } = useStore();
+    const { composition, updateCompositionAndSync, activeSelection, addToGallery, removeFromGallery } = useStore();
+    const gallery = composition.imageGallery || [];
 
     // Flatten all sections to find the selected one easily
     const flattenedSections = React.useMemo(() => {
@@ -22,7 +25,7 @@ export function AnnotationsEditor() {
 
     const activeSection = flattenedSections.find(s => s.id === activeSelection.sectionId);
 
-    const handleAddAnnotation = (dType: string, dKey: string, val: string) => {
+    const handleAddAnnotation = (dType: string, dKey: string, val: string, extra?: Partial<Annotation>) => {
         if (!activeSection) return;
 
         const newAnnotation: Annotation = {
@@ -30,7 +33,8 @@ export function AnnotationsEditor() {
             type: (dType as any) || 'dynamic',
             value: val,
             offset: { x: 0, y: 0 },
-            ...(dType === 'line' ? { width: 50, scale: 1 } : {})
+            ...(dType === 'line' ? { width: 50, scale: 1 } : {}),
+            ...extra
         };
 
         const updateSection = (sections: Section[]): Section[] => {
@@ -49,6 +53,21 @@ export function AnnotationsEditor() {
             ...prev,
             sections: updateSection(prev.sections)
         }));
+    };
+
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        try {
+            const { src, aspectRatio } = await processImageFile(file);
+            addToGallery(src, aspectRatio);
+        } catch (err) {
+            console.error("Failed to process image upload", err);
+        }
+        
+        // Reset input for next same-file selection
+        e.target.value = '';
     };
 
     const dynamics = [
@@ -98,8 +117,13 @@ export function AnnotationsEditor() {
         }
     ];
 
-    const handleDragStart = (e: React.DragEvent<HTMLButtonElement>, val: string, dType: string) => {
-        e.dataTransfer.setData('application/json', JSON.stringify({ type: 'new-annotation', value: val, annotationType: dType }));
+    const handleDragStart = (e: React.DragEvent<HTMLButtonElement | HTMLDivElement>, val: string, dType: string, extra?: any) => {
+        e.dataTransfer.setData('application/json', JSON.stringify({ 
+            type: 'new-annotation', 
+            value: val, 
+            annotationType: dType,
+            extra 
+        }));
         e.dataTransfer.effectAllowed = 'copy';
     };
 
@@ -188,6 +212,60 @@ export function AnnotationsEditor() {
                                 </div>
                             </Button>
                         ))}
+                    </div>
+
+                    <h4 className="text-sm font-medium mt-4">Images (Gallery)</h4>
+                    <div className="space-y-3">
+                        <Button
+                            variant="outline"
+                            className="w-full gap-2 text-xs h-10 border-dashed hover:border-primary hover:text-primary transition-colors"
+                            onClick={() => document.getElementById('image-upload')?.click()}
+                        >
+                            <Upload className="w-4 h-4" />
+                            Add to Library (JPG/PNG)
+                        </Button>
+                        <input 
+                            id="image-upload"
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleImageUpload}
+                        />
+                        
+                        {gallery.length > 0 ? (
+                            <div className="grid grid-cols-2 gap-2 mt-2">
+                                {gallery.map((item) => (
+                                    <div key={item.id} className="relative group aspect-video border rounded-md overflow-hidden bg-muted/20 flex items-center justify-center p-1 shadow-sm hover:border-primary/50 transition-all">
+                                        <div 
+                                            className="w-full h-full cursor-grab active:cursor-grabbing flex items-center justify-center"
+                                            draggable
+                                            onDragStart={(e) => handleDragStart(e, 'photo', 'image', { src: item.src, aspectRatio: item.aspectRatio, scale: 0.5 })}
+                                        >
+                                            <img 
+                                                src={item.src} 
+                                                alt="Gallery item" 
+                                                className="max-w-full max-h-full object-contain pointer-events-none" 
+                                            />
+                                        </div>
+                                        <Button
+                                            variant="destructive"
+                                            size="icon"
+                                            className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 hover:bg-destructive text-destructive hover:text-destructive-foreground border shadow-sm"
+                                            onClick={() => removeFromGallery(item.id)}
+                                        >
+                                            <Trash2 className="h-3 w-3" />
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="border border-dashed rounded-md p-4 flex flex-col items-center justify-center bg-muted/5">
+                                <ImageIcon className="w-8 h-8 text-muted-foreground/30 mb-2" />
+                                <p className="text-[10px] text-muted-foreground text-center px-4 leading-normal">
+                                    Upload photos to your library, then drag them onto the canvas.
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </div>
 

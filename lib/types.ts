@@ -1,8 +1,10 @@
 export interface Annotation {
   id: string;
-  type: 'dynamic' | 'text' | 'tempo' | 'marker' | 'clef' | 'articulation' | 'bowing' | 'line';
+  type: 'dynamic' | 'text' | 'tempo' | 'marker' | 'clef' | 'articulation' | 'bowing' | 'line' | 'image';
   value: string;
   offset: { x: number; y: number };
+  src?: string; // Base64 data for images
+  aspectRatio?: number; // Width / Height ratio for images
   color?: string;
   scale?: number;
   width?: number; // Useful for line annotations like crescendo
@@ -105,6 +107,7 @@ export interface Composition {
   createdBy?: string;
   sections: Section[];
   style?: GlobalStyle;
+  imageGallery?: { id: string; src: string; aspectRatio: number }[];
 }
 
 export type PageSize = 'letter' | 'legal' | 'tabloid';

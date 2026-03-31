@@ -16,7 +16,15 @@ export function serializeComposition(composition: Composition): string {
     if (composition.createdBy) lines.push(`Created By: ${composition.createdBy}`);
     lines.push(''); // Blank line separator
 
-    // 2. Serialize Nested Sections recursively
+    // 2. Serialize Gallery Assets
+    if (composition.imageGallery && composition.imageGallery.length > 0) {
+        composition.imageGallery.forEach(item => {
+            lines.push(`Asset: ${JSON.stringify(item)}`);
+        });
+        lines.push(''); // Blank line separator
+    }
+
+    // 3. Serialize Nested Sections recursively
     const serializeSection = (section: Section, level: number) => {
         const tabs = '\t'.repeat(level - 1);
 
@@ -52,6 +60,8 @@ export function serializeComposition(composition: Composition): string {
                 if (ann.scale !== undefined) extraOptions.scale = ann.scale;
                 if (ann.hidden !== undefined) extraOptions.hidden = ann.hidden;
                 if (ann.width !== undefined) extraOptions.width = ann.width;
+                if (ann.src) extraOptions.src = ann.src;
+                if (ann.aspectRatio !== undefined) extraOptions.aspectRatio = ann.aspectRatio;
 
                 if (Object.keys(extraOptions).length > 0) {
                     extraStr = ' ' + JSON.stringify(extraOptions);
