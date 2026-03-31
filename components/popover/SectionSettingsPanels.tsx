@@ -5,14 +5,21 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { ColorPicker, TextModifiers } from './SharedControls';
-import { SectionStyle } from '../../lib/types';
+import { HelpCircle } from 'lucide-react';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Section, SectionStyle } from '../../lib/types';
 
 export interface SettingPanelProps {
     style: Partial<SectionStyle>;
     updateStyle: (patch: Partial<SectionStyle>) => void;
 }
 
-export function StartMeasurePanel({ style, updateStyle }: SettingPanelProps) {
+export function StartMeasurePanel({ style, updateStyle, startMeasureLabel, updateSection }: SettingPanelProps & { startMeasureLabel: string; updateSection: (p: Partial<Section>) => void }) {
     return (
         <div className="space-y-4">
             <div className="space-y-2">
@@ -38,12 +45,12 @@ export function StartMeasurePanel({ style, updateStyle }: SettingPanelProps) {
             />
 
             <div className="space-y-2">
-                <Label className="text-xs font-semibold">Override Text</Label>
+                <Label className="text-xs font-semibold">Custom Label</Label>
                 <Input
                     className="h-8 text-xs"
                     placeholder="ex. 1a"
-                    value={style.startMeasureTextOverride || ''}
-                    onChange={(e) => updateStyle({ startMeasureTextOverride: e.target.value })}
+                    value={startMeasureLabel}
+                    onChange={(e) => updateSection({ startMeasureLabel: e.target.value })}
                 />
             </div>
 
@@ -67,7 +74,7 @@ export function StartMeasurePanel({ style, updateStyle }: SettingPanelProps) {
     );
 }
 
-export function MeasureRangePanel({ style, updateStyle, showMeasureCount, onToggleShowMeasureCount }: SettingPanelProps & { showMeasureCount: boolean; onToggleShowMeasureCount: (v: boolean) => void }) {
+export function MeasureRangePanel({ style, updateStyle, showMeasureCount, measureRangeLabel, updateSection, onToggleShowMeasureCount }: SettingPanelProps & { showMeasureCount: boolean; measureRangeLabel: string; updateSection: (p: Partial<Section>) => void; onToggleShowMeasureCount: (v: boolean) => void }) {
     return (
         <div className="space-y-4">
             <TextModifiers
@@ -76,12 +83,12 @@ export function MeasureRangePanel({ style, updateStyle, showMeasureCount, onTogg
             />
 
             <div className="space-y-2">
-                <Label className="text-xs font-semibold">Override Text</Label>
+                <Label className="text-xs font-semibold">Custom Label</Label>
                 <Input
                     className="h-8 text-xs"
                     placeholder="ex. verses"
-                    value={style.measureRangeTextOverride || ''}
-                    onChange={(e) => updateStyle({ measureRangeTextOverride: e.target.value })}
+                    value={measureRangeLabel}
+                    onChange={(e) => updateSection({ measureRangeLabel: e.target.value })}
                 />
             </div>
 
@@ -167,20 +174,22 @@ export function BracePanel({ style, effectiveBraceShape, updateStyle }: SettingP
 
 type GenericTextType = 'title' | 'text' | 'tempo';
 
-export function GenericTextPanel({ type, style, updateStyle }: SettingPanelProps & { type: GenericTextType }) {
+export function GenericTextPanel({ type, style, updateStyle, value, onUpdateValue }: SettingPanelProps & { type: GenericTextType; value: string; onUpdateValue: (val: string) => void }) {
     const config = {
         title: {
             modifiers: 'titleModifiers', defaultModifiers: ['bold'],
-            color: 'titleColor', hide: 'hideTitle', hideLabel: 'Hide Title'
+            color: 'titleColor', hide: 'hideTitle', hideLabel: 'Hide Title',
+            placeholder: 'Enter Title...'
         },
         text: {
             modifiers: 'textModifiers', defaultModifiers: [],
-            color: 'textColor', hide: 'hideText', hideLabel: 'Hide Text Context'
+            color: 'textColor', hide: 'hideText', hideLabel: 'Hide Text Context',
+            placeholder: 'Enter Text...'
         },
         tempo: {
             modifiers: 'tempoModifiers', defaultModifiers: ['bold'],
             color: 'tempoColor', hide: 'hideTempo', hideLabel: 'Hide Tempo',
-            override: 'tempoTextOverride', overridePlaceholder: 'ex. Allegro'
+            placeholder: 'ex. Allegro q=120'
         }
     } as const;
 
@@ -193,17 +202,33 @@ export function GenericTextPanel({ type, style, updateStyle }: SettingPanelProps
                 onChange={(val) => updateStyle({ [c.modifiers]: val })}
             />
 
-            {'override' in c && (
-                <div className="space-y-2">
-                    <Label className="text-xs font-semibold">Override Text</Label>
-                    <Input
-                        className="h-8 text-xs"
-                        placeholder={c.overridePlaceholder}
-                        value={(style as any)[c.override] || ''}
-                        onChange={(e) => updateStyle({ [c.override]: e.target.value })}
-                    />
+            <div className="space-y-2">
+                <div className="flex items-center gap-1.5">
+                    <Label className="text-xs font-semibold">
+                        {type === 'title' ? 'Title' : type === 'text' ? 'Text Content' : 'Tempo'}
+                    </Label>
+                    {type === 'tempo' && (
+                        <TooltipProvider delayDuration={300}>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                                </TooltipTrigger>
+                                <TooltipContent side="right" className="text-[10px] py-1.5 px-2 max-w-[180px]">
+                                    <p className="font-semibold mb-1">Notation Shorthand:</p>
+                                    <p>w=whole, h=half, q=quarter, e=eighth, s=sixteenth</p>
+                                    <p className="mt-1 text-muted-foreground italic">(add '.' for dotted, e.g. q.)</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    )}
                 </div>
-            )}
+                <Input
+                    className="h-8 text-xs"
+                    placeholder={(c as any).placeholder || `Enter ${type}...`}
+                    value={value}
+                    onChange={(e) => onUpdateValue(e.target.value)}
+                />
+            </div>
 
             <Separator />
 

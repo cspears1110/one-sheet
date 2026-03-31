@@ -39,11 +39,13 @@ export function SkeletonGenerator() {
         { id: 'init-1', mark: '', start: 1 },
         { id: 'init-2', mark: 'A', start: '' }
     ]);
+    const [finalMeasure, setFinalMeasure] = useState<number | ''>('');
     const generateSequence = useStore((state) => state.generateSequence);
 
     // Reset rows when dialog opens
     useEffect(() => {
         if (open) {
+            setFinalMeasure('');
             const now = Date.now();
             const { sections } = useStore.getState().composition;
             const isProjectEmpty = sections.length <= 1 && (!sections[0] || (sections[0].title === '' && sections[0].editorLabel === '' && sections[0].startMeasure === 1));
@@ -61,24 +63,27 @@ export function SkeletonGenerator() {
         }
     }, [open]);
 
-    const predictNextMark = (currentMark: string): string => {
-        if (!currentMark) return '';
+    const predictNextMark = (lastRow: Row): string => {
+        const { mark, start } = lastRow;
+        if (!mark) return '';
 
-        // Single uppercase letter
-        if (/^[A-Z]$/.test(currentMark)) {
-            const code = currentMark.charCodeAt(0);
+        // Heuristic: If the Mark is a number that matches its Starting Measure, 
+        // the user is using the "Measure Number as Label" pattern.
+        // We shouldn't guess the next measure number, so return empty.
+        if (/^\d+$/.test(mark) && start.toString() === mark) {
+            return '';
+        }
+
+        // Single uppercase letter (Rehearsal Letters A, B, C...)
+        if (/^[A-Z]$/.test(mark)) {
+            const code = mark.charCodeAt(0);
+            if (mark === 'Z') return ''; 
             return String.fromCharCode(code + 1);
         }
 
-        // Number
-        if (/^\d+$/.test(currentMark)) {
-            return (parseInt(currentMark, 10) + 1).toString();
-        }
-
-        // Prefix + Number (e.g., V1 -> V2)
-        const match = currentMark.match(/^([a-zA-Z]+)(\d+)$/);
-        if (match) {
-            return `${match[1]}${parseInt(match[2], 10) + 1}`;
+        // Rehearsal Numbers (1, 2, 3...)
+        if (/^\d+$/.test(mark)) {
+            return (parseInt(mark, 10) + 1).toString();
         }
 
         return '';
@@ -111,11 +116,11 @@ export function SkeletonGenerator() {
 
     const addManualRow = () => {
         setRows((prev) => {
-            const lastMark = prev[prev.length - 1]?.mark || '';
+            const lastRow = prev[prev.length - 1];
             const newRows = [...prev];
-            // Clear any previous autofocus flags so they don't unexpectedly trigger on re-renders later (though React handles this mostly)
+            // Clear any previous autofocus flags
             const cleanRows = newRows.map(r => ({ ...r, autoFocusMark: false, autoFocusStart: false }));
-            return [...cleanRows, { id: Date.now().toString(), mark: predictNextMark(lastMark), start: '', autoFocusStart: true }];
+            return [...cleanRows, { id: Date.now().toString(), mark: lastRow ? predictNextMark(lastRow) : '', start: '', autoFocusStart: true }];
         });
     };
 
@@ -140,7 +145,7 @@ export function SkeletonGenerator() {
         // Ensure sorted by start measure
         validRows.sort((a, b) => (a.start as number) - (b.start as number));
 
-        generateSequence(validRows as { mark: string, start: number }[], mode);
+        generateSequence(validRows as { mark: string, start: number }[], mode, typeof finalMeasure === 'number' ? finalMeasure : undefined);
         setShowReplaceWarning(false);
         setOpen(false);
     };
@@ -157,7 +162,7 @@ export function SkeletonGenerator() {
                 <DialogHeader>
                     <DialogTitle>Quick Form Skeleton</DialogTitle>
                     <DialogDescription>
-                        Quickly sketch out a work's formal structure. Type a rehearsal mark and its starting measure. A new row will auto-generate information.
+                        Quickly sketch out a work's formal structure. Type a rehearsal mark and its starting measure.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -169,11 +174,12 @@ export function SkeletonGenerator() {
                     </div>
 
                     <div className="max-h-[300px] overflow-y-auto space-y-2 p-1">
-                        {rows.map((row, index) => (
+                        {rows.map((row) => (
                             <div key={row.id} className="grid grid-cols-[1fr_1fr_auto] gap-4 items-center">
                                 <Input
                                     value={row.mark}
                                     onChange={(e) => handleRowChange(row.id, 'mark', e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && addManualRow()}
                                     placeholder="e.g. A, V1, 10"
                                     autoFocus={row.autoFocusMark}
                                 />
@@ -182,6 +188,7 @@ export function SkeletonGenerator() {
                                     min="1"
                                     value={row.start}
                                     onChange={(e) => handleRowChange(row.id, 'start', e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && addManualRow()}
                                     placeholder="e.g. 1"
                                     autoFocus={row.autoFocusStart}
                                 />
@@ -197,13 +204,28 @@ export function SkeletonGenerator() {
                             </div>
                         ))}
                     </div>
-                    <Button variant="ghost" size="sm" onClick={addManualRow} className="justify-start gap-2 text-muted-foreground w-fit">
-                        <Plus className="w-4 h-4" />
-                        Add Row
-                    </Button>
+
+                    <div className="flex items-center justify-between pt-2 border-t mt-2">
+                        <Button variant="ghost" size="sm" onClick={addManualRow} className="gap-2 text-muted-foreground">
+                            <Plus className="w-4 h-4" />
+                            Add Row
+                        </Button>
+
+                        <div className="flex items-center gap-2">
+                            <Label htmlFor="final-measure" className="text-xs whitespace-nowrap text-muted-foreground">Final measure:</Label>
+                            <Input
+                                id="final-measure"
+                                type="number"
+                                className="w-20 h-8"
+                                value={finalMeasure}
+                                onChange={(e) => setFinalMeasure(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+                                placeholder="Last"
+                            />
+                        </div>
+                    </div>
                 </div>
 
-                <DialogFooter className="flex-col sm:flex-row gap-2">
+                <DialogFooter className="flex-col sm:flex-row gap-2 pt-4">
                     <Button variant="secondary" onClick={() => handleGenerateClick('append')} className="w-full sm:w-auto">
                         Append to Canvas
                     </Button>

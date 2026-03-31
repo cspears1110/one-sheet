@@ -165,7 +165,52 @@ export function FormEditor() {
         setTimeout(() => setActiveSectionId(newId), 50);
     };
 
-    const handleAddSiblingSection = (id: string) => {
+    const handleAddSiblingAbove = (id: string) => {
+        const index = flattenedItems.findIndex(i => i.id === id);
+        if (index === -1) return;
+
+        const referenceItem = flattenedItems[index];
+
+        let siblingCount = 0;
+        if (referenceItem.depth === 0) {
+            siblingCount = flattenedItems.filter(i => i.depth === 0).length;
+        } else {
+            let parentIndex = -1;
+            for (let i = index - 1; i >= 0; i--) {
+                if (flattenedItems[i].depth === referenceItem.depth - 1) {
+                    parentIndex = i;
+                    break;
+                }
+            }
+            if (parentIndex !== -1) {
+                for (let i = parentIndex + 1; i < flattenedItems.length; i++) {
+                    if (flattenedItems[i].depth <= flattenedItems[parentIndex].depth) break;
+                    if (flattenedItems[i].depth === referenceItem.depth) siblingCount++;
+                }
+            }
+        }
+
+        const newId = uuidv4();
+        const newSection: FlattenedItem = {
+            id: newId,
+            title: '',
+            editorLabel: referenceItem.depth === 0 ? `Section ${siblingCount + 1}` : `Subsection ${siblingCount + 1}`,
+            startMeasure: referenceItem.startMeasure,
+            endMeasure: undefined,
+            subSections: [],
+            annotations: [],
+            depth: referenceItem.depth
+        };
+
+        const newItems = [...flattenedItems];
+        newItems.splice(index, 0, newSection);
+        updateCompositionAndSync(prev => ({ ...prev, sections: buildTreeFromFlatWithDepth(newItems) }));
+
+        setNewSectionId(newId);
+        setTimeout(() => setActiveSectionId(newId), 50);
+    };
+
+    const handleAddSiblingBelow = (id: string) => {
         const index = flattenedItems.findIndex(i => i.id === id);
         if (index === -1) return;
 
@@ -201,7 +246,7 @@ export function FormEditor() {
             id: newId,
             title: '',
             editorLabel: referenceItem.depth === 0 ? `Section ${siblingCount + 1}` : `Subsection ${siblingCount + 1}`,
-            startMeasure: 0,
+            startMeasure: referenceItem.endMeasure !== undefined ? referenceItem.endMeasure + 1 : referenceItem.startMeasure + 1,
             endMeasure: undefined,
             subSections: [],
             annotations: [],
@@ -212,6 +257,46 @@ export function FormEditor() {
         newItems.splice(insertIndex + 1, 0, newSection);
         updateCompositionAndSync(prev => ({ ...prev, sections: buildTreeFromFlatWithDepth(newItems) }));
 
+        setNewSectionId(newId);
+        setTimeout(() => setActiveSectionId(newId), 50);
+    };
+
+    const handleAddSuperSection = (id: string) => {
+        const index = flattenedItems.findIndex(i => i.id === id);
+        if (index === -1) return;
+
+        const targetItem = flattenedItems[index];
+        const newId = uuidv4();
+        
+        // Count descendants to wrap
+        let wrapCount = 1; // start with target
+        for (let i = index + 1; i < flattenedItems.length; i++) {
+            if (flattenedItems[i].depth <= targetItem.depth) break;
+            wrapCount++;
+        }
+
+        const newSuper: FlattenedItem = {
+            id: newId,
+            title: '',
+            editorLabel: 'Groups Block',
+            startMeasure: targetItem.startMeasure,
+            endMeasure: undefined,
+            subSections: [],
+            annotations: [],
+            depth: targetItem.depth
+        };
+
+        const newItems = [...flattenedItems];
+        
+        // 1. Insert super at target's position
+        newItems.splice(index, 0, newSuper);
+        
+        // 2. Increment depth of target and all its descendants (now offset by 1 because of spice)
+        for (let i = index + 1; i <= index + wrapCount; i++) {
+            newItems[i] = { ...newItems[i], depth: newItems[i].depth + 1 };
+        }
+
+        updateCompositionAndSync(prev => ({ ...prev, sections: buildTreeFromFlatWithDepth(newItems) }));
         setNewSectionId(newId);
         setTimeout(() => setActiveSectionId(newId), 50);
     };
@@ -337,7 +422,7 @@ export function FormEditor() {
             // Always allow command/ctrl + enter to create a sibling section, even if inside an input
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                 e.preventDefault();
-                handleAddSiblingSection(activeSectionId);
+                handleAddSiblingBelow(activeSectionId);
                 return;
             }
 
@@ -354,7 +439,7 @@ export function FormEditor() {
                     // Just in case, though caught above
                     if (e.metaKey || e.ctrlKey) {
                         e.preventDefault();
-                        handleAddSiblingSection(activeSectionId);
+                        handleAddSiblingBelow(activeSectionId);
                     }
                     break;
                 case 'ArrowRight':
@@ -397,7 +482,7 @@ export function FormEditor() {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [activeSectionId, visibleItems, handleDelete, handlePromote, handleDemote, handleMoveUp, handleMoveDown, handleAddSection, handleAddSubsection, handleAddSiblingSection]);
+    }, [activeSectionId, visibleItems, handleDelete, handlePromote, handleDemote, handleMoveUp, handleMoveDown, handleAddSection, handleAddSubsection, handleAddSiblingBelow]);
 
     return (
         <div className="flex flex-col space-y-6">
@@ -464,6 +549,9 @@ export function FormEditor() {
                                 onPromote={() => handlePromote(item.id)}
                                 onDemote={() => handleDemote(item.id)}
                                 onAddSubsection={() => handleAddSubsection(item.id)}
+                                onAddSiblingAbove={() => handleAddSiblingAbove(item.id)}
+                                onAddSiblingBelow={() => handleAddSiblingBelow(item.id)}
+                                onAddSuperSection={() => handleAddSuperSection(item.id)}
                                 isNewlyCreated={newSectionId === item.id}
                                 onClearNewlyCreated={() => setNewSectionId(null)}
                             />

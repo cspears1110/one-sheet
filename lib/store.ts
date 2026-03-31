@@ -25,7 +25,7 @@ export interface AppState {
     setActiveSelection: (selection: ActiveSelection) => void;
     showRawTextEditor: boolean;
     setShowRawTextEditor: (show: boolean) => void;
-    generateSequence: (rows: { mark: string; start: number }[], mode: 'append' | 'replace') => void;
+    generateSequence: (rows: { mark: string; start: number }[], mode: 'append' | 'replace', finalMeasure?: number) => void;
 }
 
 export const useStore = create<AppState>()(
@@ -85,10 +85,16 @@ export const useStore = create<AppState>()(
             setActiveSelection: (selection) => set({ activeSelection: selection }),
             showRawTextEditor: false,
             setShowRawTextEditor: (show) => set({ showRawTextEditor: show }),
-            generateSequence: (rows, mode) => set((state) => {
+            generateSequence: (rows, mode, finalMeasure) => set((state) => {
                 const newSections: Section[] = rows.map((row, i) => {
                     const nextRow = rows[i+1];
-                    const endMeasure = nextRow && nextRow.start > row.start ? nextRow.start - 1 : undefined;
+                    let endMeasure = nextRow && nextRow.start > row.start ? nextRow.start - 1 : undefined;
+                    
+                    // If this is the last row and we have a final measure, use it
+                    if (!nextRow && finalMeasure && finalMeasure >= row.start) {
+                        endMeasure = finalMeasure;
+                    }
+
                     return {
                         id: `section-${Date.now()}-${i}`,
                         title: '',

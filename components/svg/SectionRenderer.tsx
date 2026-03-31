@@ -28,32 +28,33 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
     const isSelected = (type: ActiveSelectionType) =>
         activeSelection.sectionId === section.id && activeSelection.type === type;
 
-    // Helper to parse text tokens and render SMuFL symbols in isolated tspan blocks
+    // Helper to parse text tokens and render SMuFL symbols
     const formatTempoText = (text: string) => {
-        const parts = text.split(/(\[w\.\]|\[h\.\]|\[q\.\]|\[e\.\]|\[s\.\]|\[w\]|\[h\]|\[q\]|\[e\]|\[s\])/);
+        // Regex matches standalone q, w, h, e, s (optionally dotted)
+        const parts = text.split(/(\b[whqes]\.?(?!\w))/);
 
         let currentOffsetX = 0;
         return parts.map((part, index) => {
             let pathData = null;
             let hasDot = false;
             switch (part) {
-                case '[w.]': pathData = BravuraPaths.W_NOTE; hasDot = true; break;
-                case '[h.]': pathData = BravuraPaths.H_NOTE; hasDot = true; break;
-                case '[q.]': pathData = BravuraPaths.Q_NOTE; hasDot = true; break;
-                case '[e.]': pathData = BravuraPaths.E_NOTE; hasDot = true; break;
-                case '[s.]': pathData = BravuraPaths.S_NOTE; hasDot = true; break;
-                case '[w]': pathData = BravuraPaths.W_NOTE; break;
-                case '[h]': pathData = BravuraPaths.H_NOTE; break;
-                case '[q]': pathData = BravuraPaths.Q_NOTE; break;
-                case '[e]': pathData = BravuraPaths.E_NOTE; break;
-                case '[s]': pathData = BravuraPaths.S_NOTE; break;
+                case 'w.': pathData = BravuraPaths.W_NOTE; hasDot = true; break;
+                case 'h.': pathData = BravuraPaths.H_NOTE; hasDot = true; break;
+                case 'q.': pathData = BravuraPaths.Q_NOTE; hasDot = true; break;
+                case 'e.': pathData = BravuraPaths.E_NOTE; hasDot = true; break;
+                case 's.': pathData = BravuraPaths.S_NOTE; hasDot = true; break;
+                case 'w': pathData = BravuraPaths.W_NOTE; break;
+                case 'h': pathData = BravuraPaths.H_NOTE; break;
+                case 'q': pathData = BravuraPaths.Q_NOTE; break;
+                case 'e': pathData = BravuraPaths.E_NOTE; break;
+                case 's': pathData = BravuraPaths.S_NOTE; break;
                 default:
                     if (!part) return null;
                     const elX = currentOffsetX;
 
                     // Approximate widths for a 14px bold sans-serif font
                     const getCharWidth = (char: string) => {
-                        if (char === ' ') return 4;
+                        if (char === ' ') return 2;
                         if (/[WMOQG@\%]/.test(char)) return 11;
                         if (/[A-Z]/.test(char)) return 9.5;
                         if (/[ilj.,()\-\'\:\;]/.test(char)) return 4.5;
@@ -78,16 +79,17 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                 const noteWidth = pathData.width * scale;
 
                 // Add spacing if it has a dot
-                const dotPadding = 3; // Extra space between notehead and dot
+                const dotPadding = 2; // Reduced from 3
                 const dotWidth = hasDot ? (BravuraPaths.AUG_DOT.width * scale + dotPadding) : 0;
 
                 const totalWidth = noteWidth + dotWidth;
 
-                const elX = currentOffsetX;
-                currentOffsetX += totalWidth + 4; // padding against next text
+                // Subtract a bit from elX to pull it tighter, then update currentOffsetX
+                const elX = currentOffsetX - 8; 
+                currentOffsetX += (totalWidth - 8) + 2; 
 
                 return (
-                    <g key={index} transform={`translate(${elX}, 0) scale(${scale})`} fill="currentColor">
+                    <g key={index} transform={`translate(${elX}, 0) scale(${scale})`}>
                         <path d={pathData.d} />
                         {hasDot && (
                             <path d={BravuraPaths.AUG_DOT.d} transform={`translate(${pathData.width + (dotPadding / scale)}, 0)`} />
@@ -349,36 +351,23 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                     onClick={(e) => handleClick(e, 'tempo')}
                 >
                     <rect x={4} y={-60} width={200} height={16} fill="transparent" />
-                    {currentStyle.tempoTextOverride ? (
-                        <text
-                            x={8}
-                            y={-40}
-                            fill={isSelected('tempo') ? '#2563eb' : (hideTempo ? '#d1d5db' : tempoColor)}
-                            fontSize={14}
-                            fontFamily="sans-serif"
-                            {...getFontStyle(currentStyle.tempoModifiers || ['bold'])}
-                            style={getFontStyle(currentStyle.tempoModifiers || ['bold'])}
-                        >
-                            {currentStyle.tempoTextOverride}
-                        </text>
-                    ) : (
-                        <g
-                            transform="translate(8, -40)"
-                            fill={isSelected('tempo') ? '#2563eb' : (hideTempo ? '#d1d5db' : tempoColor)}
-                            fontSize={14}
-                            fontFamily="sans-serif"
-                            {...getFontStyle(currentStyle.tempoModifiers || ['bold'])}
-                            style={getFontStyle(currentStyle.tempoModifiers || ['bold'])}
-                        >
-                            {formatTempoText(section.tempo)}
-                        </g>
-                    )}
+                    <g
+                        transform="translate(8, -40)"
+                        fill={isSelected('tempo') ? '#2563eb' : (hideTempo ? '#d1d5db' : tempoColor)}
+                        fontSize={14}
+                        fontFamily="sans-serif"
+                        {...getFontStyle(currentStyle.tempoModifiers || ['bold'])}
+                        style={getFontStyle(currentStyle.tempoModifiers || ['bold'])}
+                    >
+                        {formatTempoText(section.tempo)}
+                    </g>
+
                 </g>
             )}
 
             {/* Start Measure Number Interactive Group */}
             {!isFirstChild && !hideStartMeasure && (() => {
-                const smText = currentStyle.startMeasureTextOverride || positioned.startMeasure.toString();
+                const smText = section.startMeasureLabel || positioned.startMeasure.toString();
                 const smFont = (currentStyle.startMeasureTextModifiers || ['bold']).includes('bold') ? 'bold 12px sans-serif' : '12px sans-serif';
                 const smWidth = measureTextWidth(smText, smFont);
                 const hasShape = currentStyle.startMeasureShape === 'circle' || currentStyle.startMeasureShape === 'square';
@@ -451,7 +440,7 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                             {...getFontStyle(currentStyle.measureRangeTextModifiers)}
                             style={getFontStyle(currentStyle.measureRangeTextModifiers)}
                         >
-                            {currentStyle.measureRangeTextOverride || (section.showMeasureCount ? measureCount.toString() : `${section.startMeasure}-${endM}`)}
+                            {section.measureRangeLabel || (section.showMeasureCount ? measureCount.toString() : `${section.startMeasure}-${endM}`)}
                         </text>
                     </g>
                 );
@@ -490,7 +479,13 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                     className={`cursor-pointer group ${hideTitle ? 'print:hidden' : ''}`}
                     onClick={(e) => handleClick(e, 'title')}
                 >
-                    <rect x={section.timeSignature ? calculateTimeSigGap(section.timeSignature) : 4} y={8} width={width - (section.timeSignature ? calculateTimeSigGap(section.timeSignature) : 4)} height={18} fill="transparent" />
+                    <rect
+                        x={section.timeSignature ? calculateTimeSigGap(section.timeSignature) : 4}
+                        y={8}
+                        width={Math.max(120, width - (section.timeSignature ? calculateTimeSigGap(section.timeSignature) : 4) + 40)}
+                        height={18}
+                        fill="transparent"
+                    />
                     <text
                         x={section.timeSignature ? calculateTimeSigGap(section.timeSignature) + 4 : 8}
                         y={24}
@@ -523,7 +518,7 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                     >
                         {wrapText(section.text, width - calculateTimeSigGap(section.timeSignature) - 16).lines.map((lineStr, i) => (
                             <tspan key={i} x={section.timeSignature ? calculateTimeSigGap(section.timeSignature) + 4 : 8} dy={i === 0 ? 0 : 16}>
-                                {lineStr}
+                                {lineStr || '\u00A0'}
                             </tspan>
                         ))}
                     </text>

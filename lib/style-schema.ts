@@ -6,12 +6,10 @@ export const stylePropertyMap: Record<string, keyof SectionStyle> = {
     StartMeasureShape: 'startMeasureShape',
     StartMeasureTextModifiers: 'startMeasureTextModifiers',
     HideStartMeasure: 'hideStartMeasure',
-    StartMeasureTextOverride: 'startMeasureTextOverride',
     StartMeasureColor: 'startMeasureColor',
 
     // Measure Range
     MeasureRangeTextModifiers: 'measureRangeTextModifiers',
-    MeasureRangeTextOverride: 'measureRangeTextOverride',
     MeasureRangeColor: 'measureRangeColor',
     HideMeasureRange: 'hideMeasureRange',
 
@@ -33,7 +31,6 @@ export const stylePropertyMap: Record<string, keyof SectionStyle> = {
 
     // Tempo
     TempoModifiers: 'tempoModifiers',
-    TempoTextOverride: 'tempoTextOverride',
     TempoColor: 'tempoColor',
     HideTempo: 'hideTempo',
 };

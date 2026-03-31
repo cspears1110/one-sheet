@@ -71,6 +71,18 @@ export function Inspector() {
         });
     };
 
+    const updateSection = (patch: Partial<Section>) => {
+        if (!actualNode) return;
+        updateCompositionAndSync((prev) => {
+            const newComp = JSON.parse(JSON.stringify(prev));
+            const target = findSectionDeepInTree(newComp.sections, actualNode.id);
+            if (target) {
+                Object.assign(target, patch);
+            }
+            return newComp;
+        });
+    };
+
     const updateGlobalText = (field: keyof Composition, value: string) => {
         updateCompositionAndSync((prev) => {
             const newComp = JSON.parse(JSON.stringify(prev));
@@ -97,21 +109,24 @@ export function Inspector() {
     const renderContent = () => {
         switch (activeSelection.type) {
             case 'startMeasure':
-                return <StartMeasurePanel style={currentStyle} updateStyle={updateStyle} />;
+                return (
+                    <StartMeasurePanel
+                        style={currentStyle}
+                        updateStyle={updateStyle}
+                        startMeasureLabel={actualNode?.startMeasureLabel || ''}
+                        updateSection={updateSection}
+                    />
+                );
             case 'measureRange':
                 return (
                     <MeasureRangePanel
                         style={currentStyle}
                         updateStyle={updateStyle}
                         showMeasureCount={actualNode?.showMeasureCount || false}
+                        measureRangeLabel={actualNode?.measureRangeLabel || ''}
+                        updateSection={updateSection}
                         onToggleShowMeasureCount={(show) => {
-                            if (!actualNode) return;
-                            updateCompositionAndSync((prev) => {
-                                const newComp = JSON.parse(JSON.stringify(prev));
-                                const target = findSectionDeepInTree(newComp.sections, actualNode.id);
-                                if (target) target.showMeasureCount = show;
-                                return newComp;
-                            });
+                            updateSection({ showMeasureCount: show });
                         }}
                     />
                 );
@@ -138,7 +153,15 @@ export function Inspector() {
             case 'title':
             case 'text':
             case 'tempo':
-                return <GenericTextPanel type={activeSelection.type} style={currentStyle} updateStyle={updateStyle} />;
+                return (
+                    <GenericTextPanel
+                        type={activeSelection.type}
+                        style={currentStyle}
+                        updateStyle={updateStyle}
+                        value={(actualNode as any)[activeSelection.type] || ''}
+                        onUpdateValue={(val) => updateSection({ [activeSelection.type]: val })}
+                    />
+                );
             case 'globalTitle':
             case 'globalSubtitle':
             case 'globalComposer':

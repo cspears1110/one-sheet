@@ -107,7 +107,7 @@ export function wrapText(text: string, maxPixelWidth: number, font: string = '12
             }
         });
 
-        if (currentLine) {
+        if (currentLine || p === '') {
             displayLines.push(currentLine);
             const currentWidth = measureTextWidth(currentLine, font);
             if (currentWidth > absoluteMaxWidth) absoluteMaxWidth = currentWidth;
@@ -126,7 +126,7 @@ function calculateMinDimensions(section: Section, config: LayoutConfig, inferred
     // 1. Calculate Start Measure width (Left Aligned)
     let startMeasureFootprint = 0;
     if (!style.hideStartMeasure) {
-        const smText = style.startMeasureTextOverride || section.startMeasure.toString();
+        const smText = section.startMeasureLabel || section.startMeasure.toString();
         const font = style.startMeasureTextModifiers?.includes('bold') ? 'bold 12px sans-serif' : '12px sans-serif';
         const textWidth = measureTextWidth(smText, font);
 
@@ -142,7 +142,7 @@ function calculateMinDimensions(section: Section, config: LayoutConfig, inferred
     let rangeStrWidth = 0;
     const endM = section.endMeasure ?? inferredEnd ?? section.startMeasure;
     if (!style.hideMeasureRange) {
-        const rangeText = style.measureRangeTextOverride || (section.showMeasureCount ? 
+        const rangeText = section.measureRangeLabel || (section.showMeasureCount ? 
             (endM - section.startMeasure + 1).toString() : 
             `${section.startMeasure}-${endM}`);
         
@@ -169,7 +169,7 @@ function calculateMinDimensions(section: Section, config: LayoutConfig, inferred
     // 5. Add additional width for annotations and tempo
     const annotationsWidth = section.annotations.length > 0 ? 50 : 0;
     const tempoFont = style.tempoModifiers?.includes('bold') ? 'bold 12px sans-serif' : '12px sans-serif';
-    const tempoWidth = section.tempo ? measureTextWidth(style.tempoTextOverride || section.tempo, tempoFont) + 20 : 0;
+    const tempoWidth = section.tempo ? measureTextWidth(section.tempo, tempoFont) + 20 : 0;
 
     let selfMinWidth = Math.max(titleRequirement + annotationsWidth, tempoWidth, minMeasureTextWidth, 60);
 

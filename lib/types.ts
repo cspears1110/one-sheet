@@ -10,13 +10,11 @@ export interface SectionStyle {
   // Start Measure
   startMeasureShape?: 'square' | 'circle' | 'none';
   startMeasureTextModifiers?: ('bold' | 'italic' | 'underline')[];
-  startMeasureTextOverride?: string;
   startMeasureColor?: string;
   hideStartMeasure?: boolean;
 
   // Measure Range
   measureRangeTextModifiers?: ('bold' | 'italic' | 'underline')[];
-  measureRangeTextOverride?: string;
   measureRangeColor?: string;
   hideMeasureRange?: boolean;
 
@@ -38,7 +36,6 @@ export interface SectionStyle {
 
   // Tempo
   tempoModifiers?: ('bold' | 'italic' | 'underline')[];
-  tempoTextOverride?: string;
   tempoColor?: string;
   hideTempo?: boolean;
 
@@ -57,7 +54,9 @@ export interface Section {
   title: string;
   editorLabel?: string;
   startMeasure: number;
+  startMeasureLabel?: string;
   endMeasure?: number;
+  measureRangeLabel?: string;
   subSections: Section[]; // Recursive structure
   annotations: Annotation[];
   tempo?: string;

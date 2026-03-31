@@ -4,7 +4,13 @@ import { Section } from '../lib/types';
 import { FlattenedItem } from '../lib/tree-utils';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Plus, Trash2, MoreVertical, ArrowUp, ArrowDown, ChevronRight, ChevronLeft, ChevronDown } from 'lucide-react';
+import { Plus, Trash2, MoreVertical, ArrowUp, ArrowDown, ChevronRight, ChevronLeft, ChevronDown, HelpCircle } from 'lucide-react';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -13,6 +19,10 @@ import {
     DropdownMenuTrigger,
     DropdownMenuCheckboxItem,
     DropdownMenuShortcut,
+    DropdownMenuSub,
+    DropdownMenuSubTrigger,
+    DropdownMenuPortal,
+    DropdownMenuSubContent,
 } from '@/components/ui/dropdown-menu';
 
 const indentationWidth = 24;
@@ -33,11 +43,14 @@ export interface SectionCardProps {
     onPromote: () => void;
     onDemote: () => void;
     onAddSubsection: () => void;
+    onAddSiblingAbove: () => void;
+    onAddSiblingBelow: () => void;
+    onAddSuperSection: () => void;
     isNewlyCreated: boolean;
     onClearNewlyCreated: () => void;
 }
 
-export function SectionCard({ item, depth, index, isCollapsed, hasChildren, isActive, onClick, onToggleCollapse, onChange, onDelete, onMoveUp, onMoveDown, onPromote, onDemote, onAddSubsection, isNewlyCreated, onClearNewlyCreated }: SectionCardProps) {
+export function SectionCard({ item, depth, index, isCollapsed, hasChildren, isActive, onClick, onToggleCollapse, onChange, onDelete, onMoveUp, onMoveDown, onPromote, onDemote, onAddSubsection, onAddSiblingAbove, onAddSiblingBelow, onAddSuperSection, isNewlyCreated, onClearNewlyCreated }: SectionCardProps) {
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [showTempo, setShowTempo] = useState(!!item.tempo);
     const [showTime, setShowTime] = useState(!!item.timeSignature);
@@ -121,26 +134,26 @@ export function SectionCard({ item, depth, index, isCollapsed, hasChildren, isAc
                                     className="h-8 font-semibold shadow-none border-dashed bg-muted/50 hover:bg-background focus:bg-background cursor-text flex-1"
                                 />
                             ) : item.title ? (
-                                <div className="h-8 flex text-sm font-semibold items-center flex-1 truncate">
-                                    <span
-                                        className="cursor-text hover:opacity-70 transition-opacity"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setIsEditingTitle(true);
-                                        }}
-                                    >
+                                <div
+                                    className="h-8 flex text-sm font-semibold items-center flex-1 cursor-text hover:opacity-70 transition-opacity"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setIsEditingTitle(true);
+                                    }}
+                                >
+                                    <span>
                                         {item.title}
                                     </span>
                                 </div>
                             ) : (
-                                <div className="h-8 flex text-sm font-semibold text-muted-foreground items-center flex-1 italic drop-shadow-sm">
-                                    <span
-                                        className="cursor-text hover:text-foreground transition-colors"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setIsEditingTitle(true);
-                                        }}
-                                    >
+                                <div
+                                    className="h-8 flex text-sm font-semibold text-muted-foreground items-center flex-1 italic drop-shadow-sm cursor-text hover:text-foreground transition-colors"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setIsEditingTitle(true);
+                                    }}
+                                >
+                                    <span>
                                         {'editorLabel' in item && item.editorLabel ? item.editorLabel : 'Untitled Section'}
                                     </span>
                                 </div>
@@ -186,9 +199,27 @@ export function SectionCard({ item, depth, index, isCollapsed, hasChildren, isAc
                                         <DropdownMenuShortcut>⌘→</DropdownMenuShortcut>
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={onAddSubsection}>
-                                        <Plus className="w-4 h-4 mr-2" /> Add Sub-section
-                                    </DropdownMenuItem>
+                                    <DropdownMenuSub>
+                                        <DropdownMenuSubTrigger>
+                                            <Plus className="w-4 h-4 mr-2" /> Add Section...
+                                        </DropdownMenuSubTrigger>
+                                        <DropdownMenuPortal>
+                                            <DropdownMenuSubContent>
+                                                <DropdownMenuItem onClick={onAddSubsection}>
+                                                    Sub-Section
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={onAddSiblingAbove}>
+                                                    Section (Above)
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={onAddSiblingBelow}>
+                                                    Section (Below)
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={onAddSuperSection}>
+                                                    Super-Section
+                                                </DropdownMenuItem>
+                                            </DropdownMenuSubContent>
+                                        </DropdownMenuPortal>
+                                    </DropdownMenuSub>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem onClick={onMoveUp}>
                                         <ArrowUp className="w-4 h-4 mr-2" /> Move Up
@@ -244,10 +275,24 @@ export function SectionCard({ item, depth, index, isCollapsed, hasChildren, isAc
                             <div className="flex gap-2 mt-2">
                                 {showTempo && (
                                     <div className="flex-1">
-                                        <label className="text-[10px] uppercase font-bold text-muted-foreground mb-0.5 block">Tempo</label>
+                                        <div className="flex items-center gap-1 mb-0.5">
+                                            <label className="text-[10px] uppercase font-bold text-muted-foreground block">Tempo</label>
+                                            <TooltipProvider delayDuration={300}>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <HelpCircle className="w-2.5 h-2.5 text-muted-foreground/60 cursor-help" />
+                                                    </TooltipTrigger>
+                                                    <TooltipContent side="top" className="text-[10px] py-1.5 px-2 max-w-[180px]">
+                                                        <p className="font-semibold mb-1">Notation Shorthand:</p>
+                                                        <p>w=whole, h=half, q=quarter, e=eighth, s=sixteenth</p>
+                                                        <p className="mt-1 text-muted-foreground italic">(add '.' for dotted, e.g. q.)</p>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                        </div>
                                         <Input
                                             className="h-7 text-xs shadow-none border-dashed bg-muted/50 hover:bg-background focus:bg-background"
-                                            placeholder="e.g. [q]=120"
+                                            placeholder="e.g. Allegro q=120"
                                             value={item.tempo || ''}
                                             onChange={e => onChange('tempo', e.target.value)}
                                         />
