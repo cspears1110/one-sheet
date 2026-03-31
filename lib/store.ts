@@ -3,11 +3,12 @@ import { persist } from 'zustand/middleware';
 import { Composition, PageConfig, Section } from './types';
 import { serializeComposition } from './serializer';
 
-export type ActiveSelectionType = 'none' | 'startMeasure' | 'measureRange' | 'timeSignature' | 'brace' | 'title' | 'text' | 'tempo' | 'startBarline' | 'endBarline' | 'globalTitle' | 'globalSubtitle' | 'globalComposer' | 'globalArranger' | 'globalCreatedBy';
+export type ActiveSelectionType = 'none' | 'startMeasure' | 'measureRange' | 'timeSignature' | 'brace' | 'title' | 'text' | 'tempo' | 'startBarline' | 'endBarline' | 'globalTitle' | 'globalSubtitle' | 'globalComposer' | 'globalArranger' | 'globalCreatedBy' | 'annotation';
 
 export interface ActiveSelection {
     sectionId: string | null;
     type: ActiveSelectionType;
+    annotationId?: string;
     rect?: DOMRect;
 }
 

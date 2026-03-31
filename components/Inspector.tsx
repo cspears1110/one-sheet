@@ -12,6 +12,8 @@ import {
 import { TimeSignaturePanel } from './popover/TimeSignaturePanel';
 import { GlobalTextPanel } from './popover/GlobalTextPanel';
 import { BarlinePanel } from './popover/BarlinePanel';
+import { AnnotationPanel } from './popover/AnnotationPanel';
+import { Annotation } from '../lib/types';
 
 export function Inspector() {
     const { composition, activeSelection, setActiveSelection, updateCompositionAndSync } = useStore();
@@ -162,10 +164,6 @@ export function Inspector() {
                         onUpdateValue={(val) => updateSection({ [activeSelection.type]: val })}
                     />
                 );
-            case 'globalTitle':
-            case 'globalSubtitle':
-            case 'globalComposer':
-            case 'globalArranger':
             case 'globalCreatedBy':
                 return (
                     <GlobalTextPanel
@@ -176,6 +174,41 @@ export function Inspector() {
                         updateText={updateGlobalText}
                     />
                 );
+            case 'annotation':
+                if (activeSelection.annotationId && actualNode) {
+                    const ann = actualNode.annotations.find(a => a.id === activeSelection.annotationId);
+                    if (ann) {
+                        return (
+                            <AnnotationPanel
+                                annotation={ann}
+                                onUpdate={(patch) => {
+                                    updateCompositionAndSync((prev) => {
+                                        const newComp = JSON.parse(JSON.stringify(prev));
+                                        const target = findSectionDeepInTree(newComp.sections, actualNode.id);
+                                        if (target) {
+                                            target.annotations = target.annotations.map((a: Annotation) => 
+                                                a.id === ann.id ? { ...a, ...patch } : a
+                                            );
+                                        }
+                                        return newComp;
+                                    });
+                                }}
+                                onDelete={() => {
+                                    updateCompositionAndSync((prev) => {
+                                        const newComp = JSON.parse(JSON.stringify(prev));
+                                        const target = findSectionDeepInTree(newComp.sections, actualNode.id);
+                                        if (target) {
+                                            target.annotations = target.annotations.filter((a: Annotation) => a.id !== ann.id);
+                                        }
+                                        return newComp;
+                                    });
+                                    setActiveSelection({ sectionId: null, type: 'none' });
+                                }}
+                            />
+                        );
+                    }
+                }
+                return null;
             default:
                 return null;
         }
@@ -188,7 +221,7 @@ export function Inspector() {
                     {activeSelection.type.replace('global', '').replace(/([A-Z])/g, ' $1').trim()} Settings
                 </h3>
                 <p className="text-xs text-muted-foreground mt-1 truncate">
-                    {isGlobal ? composition.title : (actualNode?.title || 'Section')}
+                    {isGlobal ? composition.title : (activeSelection.type === 'annotation' ? 'Sticker' : (actualNode?.title || 'Section'))}
                 </p>
             </div>
             

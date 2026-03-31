@@ -43,6 +43,24 @@ export function serializeComposition(composition: Composition): string {
             lines.push(`${tabs}Text: ${escapedText}`);
         }
 
+        // Serialize Annotations
+        if (section.annotations && section.annotations.length > 0) {
+            section.annotations.forEach(ann => {
+                let extraStr = '';
+                const extraOptions: any = {};
+                if (ann.color) extraOptions.color = ann.color;
+                if (ann.scale !== undefined) extraOptions.scale = ann.scale;
+                if (ann.hidden !== undefined) extraOptions.hidden = ann.hidden;
+                if (ann.width !== undefined) extraOptions.width = ann.width;
+
+                if (Object.keys(extraOptions).length > 0) {
+                    extraStr = ' ' + JSON.stringify(extraOptions);
+                }
+                
+                lines.push(`${tabs}Annotation: ${ann.type} ${ann.value} ${ann.offset.x} ${ann.offset.y}${extraStr}`);
+            });
+        }
+
         // Serialize UI Styles back to rawText
         if (section.style && Object.keys(section.style).length > 0) {
             const serializedStyle = serializeStyleObject(section.style);

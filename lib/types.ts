@@ -1,9 +1,12 @@
 export interface Annotation {
   id: string;
-  measureId?: string; // Reference to a specific measure if sticky
-  text: string;
-  type: 'text' | 'dynamic' | 'tempo' | 'marker';
+  type: 'dynamic' | 'text' | 'tempo' | 'marker' | 'clef' | 'articulation' | 'bowing' | 'line';
+  value: string;
   offset: { x: number; y: number };
+  color?: string;
+  scale?: number;
+  width?: number; // Useful for line annotations like crescendo
+  hidden?: boolean;
 }
 
 export interface SectionStyle {

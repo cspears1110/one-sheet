@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FormEditor } from './FormEditor';
 import { SettingsEditor } from './SettingsEditor';
 import { Inspector } from './Inspector';
+import { AnnotationsEditor } from './AnnotationsEditor';
 import CodeMirror from '@uiw/react-codemirror';
 
 export function TextEditor() {
@@ -66,12 +67,19 @@ export function TextEditor() {
                 {/* Fixed Header & Tabs */}
                 <div className="p-4 border-b border-border bg-background">
                     <h2 className="text-xl font-semibold mb-4 text-foreground">OneSheet</h2>
-                    <TabsList className={`grid w-full ${showRawTextEditor ? 'grid-cols-4' : 'grid-cols-3'} bg-muted p-1 rounded-lg h-10`}>
+                    <TabsList className={`grid w-full ${showRawTextEditor ? 'grid-cols-5' : 'grid-cols-4'} bg-muted p-1 rounded-lg h-10`}>
+
                         <TabsTrigger
                             value="form"
                             className="data-[state=active]:bg-background data-[state=active]:!text-foreground data-[state=active]:shadow-sm text-muted-foreground rounded-md !h-full transition-all text-xs"
                         >
                             Form
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="annotations"
+                            className="data-[state=active]:bg-background data-[state=active]:!text-foreground data-[state=active]:shadow-sm text-muted-foreground rounded-md !h-full transition-all text-xs"
+                        >
+                            Annotations
                         </TabsTrigger>
                         <TabsTrigger
                             value="inspector"
@@ -140,6 +148,11 @@ export function TextEditor() {
                 {/* Settings View */}
                 <TabsContent value="settings" className="flex-1 flex flex-col m-0 p-4 data-[state=active]:flex overflow-y-auto w-full">
                     <SettingsEditor />
+                </TabsContent>
+
+                {/* Annotations View */}
+                <TabsContent value="annotations" className="flex-1 flex flex-col m-0 p-4 data-[state=active]:flex overflow-y-auto w-full">
+                    <AnnotationsEditor />
                 </TabsContent>
 
                 {/* Inspector View */}

@@ -72,6 +72,39 @@ export function parseCompositionText(text: string): ParsedComposition {
             continue;
         }
 
+        // Annotation Parsing (e.g. "Annotation: dynamic mf 10 20 {\"color\":\"red\"}")
+        const annotationMatch = line.match(/^[ \t]*Annotation:\s*([a-z]+)\s+([a-zA-Z0-9_-]+)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)(?:\s+(.*))?$/i);
+        if (annotationMatch) {
+            const type = annotationMatch[1].toLowerCase() as any;
+            const value = annotationMatch[2];
+            const x = parseFloat(annotationMatch[3]);
+            const y = parseFloat(annotationMatch[4]);
+            
+            let extra = {};
+            try {
+                if (annotationMatch[5]) {
+                    extra = JSON.parse(annotationMatch[5]);
+                }
+            } catch (e) {
+                // Ignore parsing errors for trailing options
+            }
+            
+            const newAnnotation = {
+                id: uuidv4(),
+                type,
+                value,
+                offset: { x, y },
+                ...extra
+            };
+
+            if (stack.length > 0) {
+                stack[stack.length - 1].section.annotations.push(newAnnotation);
+            } else if (sections.length > 0) {
+                sections[sections.length - 1].annotations.push(newAnnotation);
+            }
+            continue;
+        }
+
         // Style parsing (e.g. "Style: MeasureShape=circle, BraceColor=red")
         const styleMatch = line.match(/^[ \t]*Style:\s*(.*)$/i);
         if (styleMatch) {

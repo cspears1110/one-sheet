@@ -1,13 +1,64 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { useStore } from '../lib/store';
-import { computeLayout, getLayoutConfig } from '../lib/layout';
+import { computeLayout, getLayoutConfig, PositionedSection } from '../lib/layout';
+import { SmuflSymbol } from './svg/SmuflComponents';
+import { Section, Annotation } from '../lib/types';
+import { v4 as uuidv4 } from 'uuid';
 import { SectionRenderer } from './svg/SectionRenderer';
 import { HeaderRenderer } from './svg/HeaderRenderer';
 
 export function CanvasRenderer() {
-    const { composition, pageConfig, activeSelection, setActiveSelection } = useStore();
+    const { composition, pageConfig, activeSelection, setActiveSelection, updateCompositionAndSync } = useStore();
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (activeSelection.type === 'annotation' && activeSelection.annotationId && activeSelection.sectionId) {
+                if (e.key === 'Delete' || e.key === 'Backspace') {
+                    // Don't delete if we're typing in an input or textarea
+                    if (
+                        document.activeElement instanceof HTMLInputElement || 
+                        document.activeElement instanceof HTMLTextAreaElement ||
+                        document.activeElement?.hasAttribute('contenteditable')
+                    ) {
+                        return;
+                    }
+
+                    e.preventDefault();
+                    const sectionId = activeSelection.sectionId;
+                    const annId = activeSelection.annotationId;
+
+                    updateCompositionAndSync((prev) => {
+                        // We use a simple deep clone approach for now as seeing elsewhere in the codebase
+                        const newComp = JSON.parse(JSON.stringify(prev));
+                        
+                        const updateSections = (secs: any[]): any[] => {
+                            return secs.map(s => {
+                                if (s.id === sectionId) {
+                                    return { 
+                                        ...s, 
+                                        annotations: s.annotations.filter((a: any) => a.id !== annId) 
+                                    };
+                                }
+                                if (s.subSections && s.subSections.length > 0) {
+                                    return { ...s, subSections: updateSections(s.subSections) };
+                                }
+                                return s;
+                            });
+                        };
+
+                        newComp.sections = updateSections(newComp.sections);
+                        return newComp;
+                    });
+                    setActiveSelection({ sectionId: null, type: 'none' });
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [activeSelection, updateCompositionAndSync, setActiveSelection]);
 
     const currentConfig = useMemo(() => getLayoutConfig(pageConfig), [pageConfig]);
 
@@ -83,6 +134,181 @@ export function CanvasRenderer() {
     const scaledWidth = logicalConfig.maxWidth * scale;
     const offsetX = 40 + ((currentConfig.maxWidth - scaledWidth) / 2);
 
+    const handleDragOver = (e: React.DragEvent<SVGSVGElement>) => {
+        e.preventDefault(); // Necessary to allow dropping
+    };
+
+    const handleDrop = (e: React.DragEvent<SVGSVGElement>) => {
+        e.preventDefault();
+        const data = e.dataTransfer.getData('application/json');
+        if (!data) return;
+
+        try {
+            const payload = JSON.parse(data);
+            if (payload.type !== 'new-annotation') return;
+
+            const svgElement = e.currentTarget;
+            const pt = svgElement.createSVGPoint();
+            pt.x = e.clientX;
+            pt.y = e.clientY;
+
+            const stavesGroup = svgElement.getElementById('logical-staves-group') as SVGGElement | null;
+            if (!stavesGroup) return;
+
+            const matrix = stavesGroup.getScreenCTM()?.inverse();
+            if (!matrix) return;
+
+            const localPt = pt.matrixTransform(matrix);
+
+            let closestSection: PositionedSection | null = null;
+            let minDistance = Infinity;
+            let closestAbsY = 0;
+
+            const allPositioned: { section: PositionedSection, absY: number }[] = [];
+            layoutStaves.forEach(staff => {
+                const addSections = (secs: PositionedSection[], parentY: number) => {
+                    secs.forEach(s => {
+                        const absY = parentY + s.y;
+                        allPositioned.push({ section: s, absY });
+                        addSections(s.children, absY);
+                    });
+                };
+                addSections(staff.sections, staff.y);
+            });
+
+            if (allPositioned.length === 0) return;
+
+            for (const item of allPositioned) {
+                const { section: s, absY } = item;
+                const centerX = s.x + (s.width / 2);
+                const centerY = absY + (s.height / 2);
+                
+                const dx = localPt.x - centerX;
+                const dy = localPt.y - centerY;
+                const dist = dx * dx + dy * dy;
+
+                if (dist < minDistance) {
+                    minDistance = dist;
+                    closestSection = s;
+                    closestAbsY = absY;
+                }
+            }
+
+            if (closestSection) {
+                const relativeX = localPt.x - closestSection.x;
+                const relativeY = localPt.y - closestAbsY;
+
+                const newAnn: Annotation = {
+                    id: uuidv4(),
+                    type: payload.annotationType || 'dynamic',
+                    value: payload.value,
+                    offset: { x: relativeX, y: relativeY },
+                    ...(payload.annotationType === 'line' ? { width: 50, scale: 1 } : {})
+                };
+
+                updateCompositionAndSync(prev => {
+                    const updateSec = (sections: Section[]): Section[] => {
+                        return sections.map(sec => {
+                            if (sec.id === closestSection!.section.id) {
+                                return { ...sec, annotations: [...sec.annotations, newAnn] };
+                            }
+                            if (sec.subSections.length > 0) {
+                                return { ...sec, subSections: updateSec(sec.subSections) };
+                            }
+                            return sec;
+                        });
+                    };
+                    return { ...prev, sections: updateSec(prev.sections) };
+                });
+                
+                setActiveSelection({ sectionId: closestSection.section.id, type: 'annotation', annotationId: newAnn.id });
+            }
+        } catch (err) {
+            console.error("Failed to parse dropped annotation", err);
+        }
+    };
+
+    const handleReparentAnnotation = (annId: string, fromSectionId: string, absoluteX: number, absoluteY: number) => {
+        const allPositioned: { section: PositionedSection, absY: number }[] = [];
+        layoutStaves.forEach(staff => {
+            const addSections = (secs: PositionedSection[], parentY: number) => {
+                secs.forEach(s => {
+                    const absY = parentY + s.y;
+                    allPositioned.push({ section: s, absY });
+                    addSections(s.children, absY);
+                });
+            };
+            addSections(staff.sections, staff.y);
+        });
+
+        if (allPositioned.length === 0) return false;
+
+        let closestSection: PositionedSection | null = null;
+        let minDistance = Infinity;
+        let closestAbsY = 0;
+
+        for (const item of allPositioned) {
+            const { section: s, absY } = item;
+            const centerX = s.x + (s.width / 2);
+            const centerY = absY + (s.height / 2);
+            
+            const dx = absoluteX - centerX;
+            const dy = absoluteY - centerY;
+            const dist = dx * dx + dy * dy;
+
+            if (dist < minDistance) {
+                minDistance = dist;
+                closestSection = s;
+                closestAbsY = absY;
+            }
+        }
+
+        if (closestSection && closestSection.section.id !== fromSectionId) {
+            const relativeX = absoluteX - closestSection.x;
+            const relativeY = absoluteY - closestAbsY;
+
+            updateCompositionAndSync(prev => {
+                let movingAnn: Annotation | null = null;
+
+                const removeAnn = (sections: Section[]): Section[] => {
+                    return sections.map(sec => {
+                        if (sec.id === fromSectionId) {
+                            const found = sec.annotations.find(a => a.id === annId);
+                            if (found) movingAnn = found;
+                            return { ...sec, annotations: sec.annotations.filter(a => a.id !== annId) };
+                        }
+                        if (sec.subSections.length > 0) {
+                            return { ...sec, subSections: removeAnn(sec.subSections) };
+                        }
+                        return sec;
+                    });
+                };
+                
+                let newSections = removeAnn(prev.sections);
+                if (!movingAnn) return prev;
+
+                const updatedAnn = { ...(movingAnn as any), offset: { x: relativeX, y: relativeY } };
+
+                const addAnn = (sections: Section[]): Section[] => {
+                    return sections.map(sec => {
+                        if (sec.id === closestSection!.section.id) {
+                            return { ...sec, annotations: [...sec.annotations, updatedAnn] };
+                        }
+                        if (sec.subSections.length > 0) {
+                            return { ...sec, subSections: addAnn(sec.subSections) };
+                        }
+                        return sec;
+                    });
+                };
+
+                return { ...prev, sections: addAnn(newSections) };
+            });
+            setActiveSelection({ sectionId: closestSection.section.id, type: 'annotation', annotationId: annId });
+            return true;
+        }
+        return false;
+    };
+
     return (
         <div className="w-full h-full overflow-hidden bg-background p-8 flex items-center justify-center print:block print:p-0 print:bg-white print-strict-container">
             <style type="text/css">
@@ -120,6 +346,8 @@ export function CanvasRenderer() {
                     aspectRatio: `${widthLimit} / ${heightLimit}`,
                 }}
                 onClick={() => setActiveSelection({ sectionId: null, type: 'none' })}
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
             >
                 {/* Unscaled exact physical layout for Document Header */}
                 <g transform="translate(40, 40)">
@@ -127,7 +355,7 @@ export function CanvasRenderer() {
                 </g>
 
                 {/* Scaled and centered layout for logical Staves */}
-                <g transform={`translate(${offsetX}, 120) scale(${scale})`}>
+                <g id="logical-staves-group" transform={`translate(${offsetX}, 120) scale(${scale})`}>
                     {layoutStaves.map((staff) => (
                         <g key={staff.id} transform={`translate(0, ${staff.y})`}>
                             {staff.sections.map((positioned, index) => (
@@ -136,6 +364,9 @@ export function CanvasRenderer() {
                                     positioned={positioned}
                                     level={1}
                                     isLastChild={index === staff.sections.length - 1}
+                                    absX={positioned.x}
+                                    absY={staff.y + positioned.y}
+                                    onReparentAnnotation={handleReparentAnnotation}
                                 />
                             ))}
                         </g>

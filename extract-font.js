@@ -43,7 +43,31 @@ opentype.load('public/fonts/BravuraText.otf', (err, font) => {
         'CUT': '\uE08B',
         'PLUS': '\uE08C',
         'MINUS': '\uE08D',
-        'AUG_DOT': '\uECB7'
+        'AUG_DOT': '\uECB7',
+        'DYN_PPP': '\uE52A',
+        'DYN_PP': '\uE52B',
+        'DYN_P': '\uE520',
+        'DYN_MP': '\uE52C',
+        'DYN_MF': '\uE52D',
+        'DYN_F': '\uE522',
+        'DYN_FF': '\uE52F',
+        'DYN_FFF': '\uE530',
+        
+        // Clefs
+        'CLEF_TREBLE': '\uE050',
+        'CLEF_BASS': '\uE062',
+        'CLEF_ALTO': '\uE05C',
+
+        // Articulations
+        'ARTIC_ACCENT': '\uE4A0',
+        'ARTIC_MARCATO': '\uE4A6',
+        'ARTIC_TENUTO': '\uE4A4',
+        'ARTIC_FERMATA': '\uE4C0',
+        'ARTIC_CAESURA': '\uE4D1',
+
+        // Bowings
+        'BOW_DOWN': '\uE610',
+        'BOW_UP': '\uE612'
     };
 
     let result = 'export const BravuraPaths = {\n';

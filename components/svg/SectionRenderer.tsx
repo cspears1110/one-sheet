@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { PositionedSection, calculateTimeSigGap, wrapText } from '../../lib/layout';
+import { Section } from '../../lib/types';
 import { useStore, ActiveSelectionType } from '../../lib/store';
 import { BravuraPaths } from '../../lib/bravura-paths';
 import { measureTextWidth } from '../../lib/measure-text';
+import { SmuflSymbol } from './SmuflComponents';
 
 interface Props {
     positioned: PositionedSection;
@@ -10,11 +12,165 @@ interface Props {
     isFirstChild?: boolean;
     isLastChild?: boolean;
     skipStartBarline?: boolean;
+    absX: number;
+    absY: number;
+    onReparentAnnotation?: (annId: string, fromSectionId: string, absX: number, absY: number) => boolean;
 }
 
-export function SectionRenderer({ positioned, level = 1, isFirstChild = false, isLastChild = true, skipStartBarline = false }: Props) {
+export function SectionRenderer({ positioned, level = 1, isFirstChild = false, isLastChild = true, skipStartBarline = false, absX, absY, onReparentAnnotation }: Props) {
     const { section, x, y, width } = positioned;
-    const { activeSelection, setActiveSelection } = useStore();
+    const { activeSelection, setActiveSelection, updateCompositionAndSync } = useStore();
+
+    const [draggingAnnotation, setDraggingAnnotation] = useState<string | null>(null);
+    const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+
+    const [resizingAnnotation, setResizingAnnotation] = useState<{ id: string, type: string, startWidth: number } | null>(null);
+    const [resizeStartScale, setResizeStartScale] = useState(1);
+    const [resizeDragOffset, setResizeDragOffset] = useState({ dx: 0, dy: 0 });
+
+    const handleAnnotationPointerDown = (e: React.PointerEvent<SVGGElement>, annId: string) => {
+        e.stopPropagation();
+        if (resizingAnnotation) return; // Prevent drag capture if resizing
+        e.currentTarget.setPointerCapture(e.pointerId);
+        setDraggingAnnotation(annId);
+        setActiveSelection({ sectionId: section.id, type: 'annotation', annotationId: annId });
+    };
+
+    const handleAnnotationPointerMove = (e: React.PointerEvent<SVGGElement>) => {
+        if (draggingAnnotation) {
+            e.stopPropagation();
+            const svgElement = e.currentTarget.ownerSVGElement;
+            if (svgElement) {
+                const pt1 = svgElement.createSVGPoint();
+                pt1.x = 0; pt1.y = 0;
+                const pt2 = svgElement.createSVGPoint();
+                pt2.x = e.movementX; pt2.y = e.movementY;
+                
+                const matrix = e.currentTarget.getScreenCTM()?.inverse();
+                if (matrix) {
+                    const localPt1 = pt1.matrixTransform(matrix);
+                    const localPt2 = pt2.matrixTransform(matrix);
+                    const dx = localPt2.x - localPt1.x;
+                    const dy = localPt2.y - localPt1.y;
+                    setDragOffset(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+                }
+            }
+        }
+    };
+
+    const handleAnnotationPointerUp = (e: React.PointerEvent<SVGGElement>, annId: string) => {
+        if (draggingAnnotation === annId) {
+            e.stopPropagation();
+            setDraggingAnnotation(null);
+            e.currentTarget.releasePointerCapture(e.pointerId);
+
+            const finalAbsX = absX + section.annotations.find(a => a.id === annId)!.offset.x + dragOffset.x;
+            const finalAbsY = absY + section.annotations.find(a => a.id === annId)!.offset.y + dragOffset.y;
+
+            if (onReparentAnnotation) {
+                const didReparent = onReparentAnnotation(annId, section.id, finalAbsX, finalAbsY);
+                if (didReparent) {
+                    setDragOffset({ x: 0, y: 0 });
+                    return;
+                }
+            }
+
+            updateCompositionAndSync((prev) => {
+                const updateSec = (sections: Section[]): Section[] => {
+                    return sections.map(sec => {
+                        if (sec.id === section.id) {
+                            return { 
+                                ...sec, 
+                                annotations: sec.annotations.map(a => 
+                                    a.id === annId ? { ...a, offset: { x: Math.round(a.offset.x + dragOffset.x), y: Math.round(a.offset.y + dragOffset.y) } } : a
+                                ) 
+                            };
+                        }
+                        if (sec.subSections.length > 0) {
+                            return { ...sec, subSections: updateSec(sec.subSections) };
+                        }
+                        return sec;
+                    });
+                };
+                return { ...prev, sections: updateSec(prev.sections) };
+            });
+            setDragOffset({ x: 0, y: 0 });
+        }
+    };
+
+    const handleResizePointerDown = (e: React.PointerEvent<SVGRectElement>, annId: string, currentScale: number, type: string, startWidth: number = 50) => {
+        e.stopPropagation();
+        e.currentTarget.setPointerCapture(e.pointerId);
+        setResizingAnnotation({ id: annId, type, startWidth });
+        setResizeStartScale(currentScale);
+        setResizeDragOffset({ dx: 0, dy: 0 });
+        setActiveSelection({ sectionId: section.id, type: 'annotation', annotationId: annId });
+    };
+
+    const handleResizePointerMove = (e: React.PointerEvent<SVGRectElement>) => {
+        if (resizingAnnotation) {
+            e.stopPropagation();
+            const svgElement = e.currentTarget.ownerSVGElement;
+            if (svgElement) {
+                const pt1 = svgElement.createSVGPoint();
+                pt1.x = 0; pt1.y = 0;
+                const pt2 = svgElement.createSVGPoint();
+                pt2.x = e.movementX; pt2.y = e.movementY;
+                
+                const matrix = e.currentTarget.getScreenCTM()?.inverse();
+                if (matrix) {
+                    const localPt1 = pt1.matrixTransform(matrix);
+                    const localPt2 = pt2.matrixTransform(matrix);
+                    const dx = localPt2.x - localPt1.x;
+                    const dy = localPt2.y - localPt1.y;
+                    
+                    setResizeDragOffset(prev => ({ dx: prev.dx + dx, dy: prev.dy + dy }));
+                }
+            }
+        }
+    };
+
+    const handleResizePointerUp = (e: React.PointerEvent<SVGRectElement>, annId: string) => {
+        if (resizingAnnotation?.id === annId) {
+            e.stopPropagation();
+            const { type, startWidth } = resizingAnnotation;
+            setResizingAnnotation(null);
+            e.currentTarget.releasePointerCapture(e.pointerId);
+
+            let newProps: any = {};
+            if (type === 'line') {
+                const finalWidth = Math.max(10, startWidth + resizeDragOffset.dx);
+                const deltaScale = resizeDragOffset.dy * 0.015;
+                const finalScale = Math.max(0.5, Math.min(5, resizeStartScale + deltaScale));
+                newProps = { width: Math.round(finalWidth), scale: Number(finalScale.toFixed(2)) };
+            } else {
+                const deltaScale = (resizeDragOffset.dx + resizeDragOffset.dy) * 0.015;
+                const finalScale = Math.max(0.5, Math.min(5, resizeStartScale + deltaScale));
+                newProps = { scale: Number(finalScale.toFixed(2)) };
+            }
+
+            updateCompositionAndSync((prev) => {
+                const updateSec = (sections: Section[]): Section[] => {
+                    return sections.map(sec => {
+                        if (sec.id === section.id) {
+                            return { 
+                                ...sec, 
+                                annotations: sec.annotations.map(a => 
+                                    a.id === annId ? { ...a, ...newProps } : a
+                                ) 
+                            };
+                        }
+                        if (sec.subSections.length > 0) {
+                            return { ...sec, subSections: updateSec(sec.subSections) };
+                        }
+                        return sec;
+                    });
+                };
+                return { ...prev, sections: updateSec(prev.sections) };
+            });
+            setResizeDragOffset({ dx: 0, dy: 0 });
+        }
+    };
 
     const handleClick = (e: React.MouseEvent<SVGElement>, type: ActiveSelectionType) => {
         e.stopPropagation();
@@ -525,9 +681,155 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                 </g>
             )}
 
+            {/* Annotations */}
+            {section.annotations.map(ann => {
+                const isSelectedAnn = activeSelection.type === 'annotation' && activeSelection.annotationId === ann.id;
+                const isDraggingThis = draggingAnnotation === ann.id;
+                const currentOffsetX = isDraggingThis ? ann.offset.x + dragOffset.x : ann.offset.x;
+                const currentOffsetY = isDraggingThis ? ann.offset.y + dragOffset.y : ann.offset.y;
+
+                const smuflTypes: Record<string, { prefix: string, boxY: number, boxHeight: number }> = {
+                    'dynamic': { prefix: 'DYN_', boxY: -450, boxHeight: 700 },
+                    'clef': { prefix: 'CLEF_', boxY: -700, boxHeight: 1000 },
+                    'articulation': { prefix: 'ARTIC_', boxY: -250, boxHeight: 400 },
+                    'bowing': { prefix: 'BOW_', boxY: -250, boxHeight: 400 },
+                };
+
+                if (ann.type in smuflTypes) {
+                    const params = smuflTypes[ann.type];
+                    const symbolKey = `${params.prefix}${ann.value.toUpperCase()}`;
+                    
+                    let currentScaleVal = ann.scale !== undefined ? ann.scale : 1;
+                    if (resizingAnnotation?.id === ann.id) {
+                        const deltaScale = (resizeDragOffset.dx + resizeDragOffset.dy) * 0.015;
+                        currentScaleVal = Math.max(0.5, Math.min(5, resizeStartScale + deltaScale));
+                    }
+                    
+                    const visualScale = currentScaleVal * 0.024;
+                    const fill = isSelectedAnn ? '#3b82f6' : (ann.color || 'black');
+                    
+                    const pathData = BravuraPaths[symbolKey as keyof typeof BravuraPaths];
+                    const intrinsicWidth = pathData ? (pathData as any).width : 1000;
+                    
+                    const boxWidth = intrinsicWidth * visualScale;
+                    const boxHeight = params.boxHeight * visualScale;
+                    const boxY = params.boxY * visualScale;
+                    
+                    const pad = 4;
+                    const drawWidth = boxWidth + (pad * 2);
+                    const drawHeight = boxHeight + (pad * 2);
+                    const drawX = -pad;
+                    const drawY = boxY - pad;
+                    
+                    return (
+                        <g
+                            key={ann.id}
+                            className={`cursor-move ${ann.hidden ? 'opacity-30 print:hidden' : ''}`}
+                            transform={`translate(${currentOffsetX}, ${currentOffsetY})`}
+                            onPointerDown={(e) => handleAnnotationPointerDown(e, ann.id)}
+                            onPointerMove={handleAnnotationPointerMove}
+                            onPointerUp={(e) => handleAnnotationPointerUp(e, ann.id)}
+                            onPointerCancel={(e) => handleAnnotationPointerUp(e, ann.id)}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            {isSelectedAnn && (
+                                <rect x={drawX} y={drawY} width={drawWidth} height={drawHeight} fill="transparent" stroke="#3b82f6" strokeWidth={1} strokeDasharray="2,2" />
+                            )}
+                            <rect x={drawX} y={drawY} width={drawWidth} height={drawHeight} fill="transparent" />
+                            <SmuflSymbol symbol={symbolKey as any} scale={visualScale} fill={fill} />
+                            
+                            {/* Resize Handle */}
+                            {isSelectedAnn && (
+                                <rect
+                                    x={drawX + drawWidth - 3}
+                                    y={drawY + drawHeight - 3}
+                                    width={6}
+                                    height={6}
+                                    fill="white"
+                                    stroke="#3b82f6"
+                                    strokeWidth={1}
+                                    className="cursor-nwse-resize print:hidden"
+                                    onPointerDown={(e) => handleResizePointerDown(e, ann.id, currentScaleVal, ann.type)}
+                                    onPointerMove={handleResizePointerMove}
+                                    onPointerUp={(e) => handleResizePointerUp(e, ann.id)}
+                                    onPointerCancel={(e) => handleResizePointerUp(e, ann.id)}
+                                />
+                            )}
+                        </g>
+                    );
+                }
+
+                if (ann.type === 'line') {
+                    const isCresc = ann.value.toLowerCase() === 'crescendo';
+                    let currentWidth = ann.width !== undefined ? ann.width : 50;
+                    let currentScaleVal = ann.scale !== undefined ? ann.scale : 1;
+
+                    if (resizingAnnotation?.id === ann.id) {
+                        currentWidth = Math.max(10, currentWidth + resizeDragOffset.dx);
+                        const deltaScale = resizeDragOffset.dy * 0.015;
+                        currentScaleVal = Math.max(0.5, Math.min(5, resizeStartScale + deltaScale));
+                    }
+
+                    const h = 10 * currentScaleVal;
+                    const boxWidth = currentWidth;
+                    const boxHeight = h * 2;
+                    const pad = 4;
+                    const drawX = -pad;
+                    const drawY = -pad;
+                    const drawWidth = boxWidth + (pad * 2);
+                    const drawHeight = boxHeight + (pad * 2);
+
+                    const color = isSelectedAnn ? '#3b82f6' : (ann.color || 'black');
+                    const linePath = isCresc 
+                        ? `M 0 ${h} L ${currentWidth} 0 M 0 ${h} L ${currentWidth} ${h*2}`
+                        : `M 0 0 L ${currentWidth} ${h} M 0 ${h*2} L ${currentWidth} ${h}`;
+
+                    return (
+                        <g
+                            key={ann.id}
+                            className={`cursor-move ${ann.hidden ? 'opacity-30 print:hidden' : ''}`}
+                            transform={`translate(${currentOffsetX}, ${currentOffsetY})`}
+                            onPointerDown={(e) => handleAnnotationPointerDown(e, ann.id)}
+                            onPointerMove={handleAnnotationPointerMove}
+                            onPointerUp={(e) => handleAnnotationPointerUp(e, ann.id)}
+                            onPointerCancel={(e) => handleAnnotationPointerUp(e, ann.id)}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            {isSelectedAnn && (
+                                <rect x={drawX} y={drawY} width={drawWidth} height={drawHeight} fill="transparent" stroke="#3b82f6" strokeWidth={1} strokeDasharray="2,2" />
+                            )}
+                            <rect x={drawX} y={drawY} width={drawWidth} height={drawHeight} fill="transparent" />
+                            <path d={linePath} stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                            
+                            {/* Resize Handle */}
+                            {isSelectedAnn && (
+                                <rect
+                                    x={drawX + drawWidth - 3}
+                                    y={drawY + drawHeight - 3}
+                                    width={6}
+                                    height={6}
+                                    fill="white"
+                                    stroke="#3b82f6"
+                                    strokeWidth={1}
+                                    className="cursor-nwse-resize print:hidden"
+                                    onPointerDown={(e) => handleResizePointerDown(e, ann.id, currentScaleVal, ann.type, ann.width || 50)}
+                                    onPointerMove={handleResizePointerMove}
+                                    onPointerUp={(e) => handleResizePointerUp(e, ann.id)}
+                                    onPointerCancel={(e) => handleResizePointerUp(e, ann.id)}
+                                />
+                            )}
+                        </g>
+                    );
+                }
+                
+                return null;
+            })}
+
             {/* Render children recursively using the pre-calculated positioning */}
+
             {positioned.children.map((child, index) => {
                 const childSkipStart = child.section.startMeasure === section.startMeasure;
+                // Add the child's relative x/y to the parent's absolute x/y to propagate down
                 return (
                     <SectionRenderer
                         key={child.section.id}
@@ -536,6 +838,9 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                         isFirstChild={index === 0}
                         isLastChild={isLastChild && index === positioned.children.length - 1}
                         skipStartBarline={childSkipStart}
+                        absX={absX + child.x}
+                        absY={absY + child.y}
+                        onReparentAnnotation={onReparentAnnotation}
                     />
                 );
             })}
