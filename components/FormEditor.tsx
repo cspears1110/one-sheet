@@ -32,8 +32,13 @@ import { SectionCard } from './SectionCard';
 import { SkeletonGenerator } from './SkeletonGenerator';
 
 export function FormEditor() {
-    const { composition, updateCompositionAndSync, collapsedIds, toggleCollapsedId } = useStore();
-    const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
+    const { composition, updateCompositionAndSync, collapsedIds, toggleCollapsedId, activeSelection, setActiveSelection } = useStore();
+    const activeSectionId = activeSelection.sectionId;
+
+    const handleSetActiveSectionId = (id: string | null) => {
+        setActiveSelection({ sectionId: id, type: id ? 'title' : 'none', source: 'form' });
+    };
+
     const [newSectionId, setNewSectionId] = useState<string | null>(null);
     const [deleteAlert, setDeleteAlert] = useState<{ isOpen: boolean; id: string | null; count: number }>({
         isOpen: false,
@@ -61,6 +66,16 @@ export function FormEditor() {
         }
         return visible;
     }, [flattenedItems, collapsedIds]);
+
+    useEffect(() => {
+        if (activeSectionId && activeSectionId !== 'global' && activeSelection.source !== 'form') {
+            const el = document.getElementById(`section-${activeSectionId}`);
+            if (el) {
+                // block: 'start' to snap the active section immediately to the top
+                el.scrollIntoView({ behavior: 'auto', block: 'start' });
+            }
+        }
+    }, [activeSectionId, activeSelection.source]);
 
     const handleMoveUp = (id: string) => {
         const index = flattenedItems.findIndex(i => i.id === id);
@@ -162,7 +177,7 @@ export function FormEditor() {
         updateCompositionAndSync(prev => ({ ...prev, sections: buildTreeFromFlatWithDepth(newItems) }));
 
         setNewSectionId(newId);
-        setTimeout(() => setActiveSectionId(newId), 50);
+        setTimeout(() => handleSetActiveSectionId(newId), 50);
     };
 
     const handleAddSiblingAbove = (id: string) => {
@@ -207,7 +222,7 @@ export function FormEditor() {
         updateCompositionAndSync(prev => ({ ...prev, sections: buildTreeFromFlatWithDepth(newItems) }));
 
         setNewSectionId(newId);
-        setTimeout(() => setActiveSectionId(newId), 50);
+        setTimeout(() => handleSetActiveSectionId(newId), 50);
     };
 
     const handleAddSiblingBelow = (id: string) => {
@@ -258,7 +273,7 @@ export function FormEditor() {
         updateCompositionAndSync(prev => ({ ...prev, sections: buildTreeFromFlatWithDepth(newItems) }));
 
         setNewSectionId(newId);
-        setTimeout(() => setActiveSectionId(newId), 50);
+        setTimeout(() => handleSetActiveSectionId(newId), 50);
     };
 
     const handleAddSuperSection = (id: string) => {
@@ -298,7 +313,7 @@ export function FormEditor() {
 
         updateCompositionAndSync(prev => ({ ...prev, sections: buildTreeFromFlatWithDepth(newItems) }));
         setNewSectionId(newId);
-        setTimeout(() => setActiveSectionId(newId), 50);
+        setTimeout(() => handleSetActiveSectionId(newId), 50);
     };
 
     const handleFieldChange = (id: string, field: keyof Section, value: any) => {
@@ -346,14 +361,14 @@ export function FormEditor() {
 
             if (visibleIndex > 0) {
                 // Focus prior section
-                setActiveSectionId(visibleItems[visibleIndex - 1].id);
+                handleSetActiveSectionId(visibleItems[visibleIndex - 1].id);
             } else {
                 // If it's the very first item, try to focus the item that will inherit its position
                 const nextSurvivorIndex = targetIndex + totalItemsToDelete;
                 if (nextSurvivorIndex < flattenedItems.length) {
-                    setActiveSectionId(flattenedItems[nextSurvivorIndex].id);
+                    handleSetActiveSectionId(flattenedItems[nextSurvivorIndex].id);
                 } else {
-                    setActiveSectionId(null);
+                    handleSetActiveSectionId(null);
                 }
             }
         }
@@ -391,7 +406,7 @@ export function FormEditor() {
 
         // Auto-focus the newly created section
         setNewSectionId(id);
-        setTimeout(() => setActiveSectionId(id), 50);
+        setTimeout(() => handleSetActiveSectionId(id), 50);
     };
 
     const handleMetaChange = (field: keyof typeof composition, value: string) => {
@@ -404,7 +419,7 @@ export function FormEditor() {
             const target = e.target as Element;
             // Deselect if we clicked outside anything that looks like a section card or an open dropdown menu portal
             if (!target.closest('[data-section-card]') && !target.closest('[role="menu"]')) {
-                setActiveSectionId(null);
+                handleSetActiveSectionId(null);
             }
         };
         // Use mousedown to react before focus events grab it
@@ -461,7 +476,7 @@ export function FormEditor() {
                     } else {
                         // Move focus up
                         const idx = visibleItems.findIndex(i => i.id === activeSectionId);
-                        if (idx > 0) setActiveSectionId(visibleItems[idx - 1].id);
+                        if (idx > 0) handleSetActiveSectionId(visibleItems[idx - 1].id);
                     }
                     break;
                 case 'ArrowDown':
@@ -471,11 +486,11 @@ export function FormEditor() {
                     } else {
                         // Move focus down
                         const idx = visibleItems.findIndex(i => i.id === activeSectionId);
-                        if (idx < visibleItems.length - 1) setActiveSectionId(visibleItems[idx + 1].id);
+                        if (idx < visibleItems.length - 1) handleSetActiveSectionId(visibleItems[idx + 1].id);
                     }
                     break;
                 case 'Escape':
-                    setActiveSectionId(null);
+                    handleSetActiveSectionId(null);
                     break;
             }
         };
@@ -540,7 +555,7 @@ export function FormEditor() {
                                 isCollapsed={collapsedIds.includes(item.id)}
                                 hasChildren={hasChildren}
                                 isActive={activeSectionId === item.id}
-                                onClick={() => setActiveSectionId(item.id)}
+                                onClick={() => handleSetActiveSectionId(item.id)}
                                 onToggleCollapse={() => toggleCollapsedId(item.id)}
                                 onChange={(field, value) => handleFieldChange(item.id, field, value)}
                                 onDelete={() => handleDelete(item.id)}

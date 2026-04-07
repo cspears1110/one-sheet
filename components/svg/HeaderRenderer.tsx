@@ -43,7 +43,7 @@ export function HeaderRenderer({ composition, config }: Props) {
                 x={centerX}
                 y={0}
                 textAnchor="middle"
-                fontSize={28}
+                fontSize={style.titleFontSize || 28}
                 fontFamily="serif"
                 fill={isSelected('globalTitle') ? '#3b82f6' : (style.hideTitle ? '#d1d5db' : (style.titleColor || 'black'))}
                 style={getFontStyle(style.titleModifiers, 'bold', 'normal')}
@@ -60,7 +60,7 @@ export function HeaderRenderer({ composition, config }: Props) {
                     x={centerX}
                     y={28}
                     textAnchor="middle"
-                    fontSize={20}
+                    fontSize={style.subtitleFontSize || 20}
                     fontFamily="serif"
                     fill={isSelected('globalSubtitle') ? '#3b82f6' : (style.hideSubtitle ? '#d1d5db' : (style.subtitleColor || 'gray'))}
                     style={getFontStyle(style.subtitleModifiers, 'normal', 'italic')}
@@ -77,7 +77,7 @@ export function HeaderRenderer({ composition, config }: Props) {
                 x={config.maxWidth}
                 y={10}
                 textAnchor="end"
-                fontSize={16}
+                fontSize={style.composerFontSize || 16}
                 fontFamily="sans-serif"
                 fill={isSelected('globalComposer') ? '#3b82f6' : (style.hideComposer ? '#d1d5db' : (style.composerColor || 'black'))}
                 style={getFontStyle(style.composerModifiers, 'normal', 'normal')}
@@ -94,7 +94,7 @@ export function HeaderRenderer({ composition, config }: Props) {
                     x={config.maxWidth}
                     y={30}
                     textAnchor="end"
-                    fontSize={14}
+                    fontSize={style.arrangerFontSize || 14}
                     fontFamily="sans-serif"
                     fill={isSelected('globalArranger') ? '#3b82f6' : (style.hideArranger ? '#d1d5db' : (style.arrangerColor || 'gray'))}
                     style={getFontStyle(style.arrangerModifiers, 'normal', 'italic')}

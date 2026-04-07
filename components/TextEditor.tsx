@@ -53,12 +53,12 @@ export function TextEditor() {
         }
     }, [showRawTextEditor, activeTab]);
 
-    // Auto-switch to Inspector tab when an item is selected
+    // Auto-switch to Inspector tab when an item is selected from canvas
     useEffect(() => {
-        if (activeSelection.type !== 'none' && activeSelection.sectionId !== null) {
+        if (activeSelection.type !== 'none' && activeSelection.sectionId !== null && activeSelection.source !== 'form') {
             setActiveTab('inspector');
         }
-    }, [activeSelection.type, activeSelection.sectionId]);
+    }, [activeSelection.type, activeSelection.sectionId, activeSelection.source]);
 
     return (
         <div className="flex flex-col h-full bg-muted/20 border-r border-border">

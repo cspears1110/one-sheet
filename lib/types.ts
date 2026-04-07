@@ -16,12 +16,16 @@ export interface SectionStyle {
   startMeasureShape?: 'square' | 'circle' | 'none';
   startMeasureTextModifiers?: ('bold' | 'italic' | 'underline')[];
   startMeasureColor?: string;
+  startMeasureFontSize?: number;
   hideStartMeasure?: boolean;
+  startMeasureOffset?: { x: number; y: number };
 
   // Measure Range
   measureRangeTextModifiers?: ('bold' | 'italic' | 'underline')[];
   measureRangeColor?: string;
+  measureRangeFontSize?: number;
   hideMeasureRange?: boolean;
+  measureRangeOffset?: { x: number; y: number };
 
   // Brace
   braceShape?: 'brace' | 'bracket' | 'line' | 'none';
@@ -32,17 +36,26 @@ export interface SectionStyle {
   // Title
   titleModifiers?: ('bold' | 'italic' | 'underline')[];
   titleColor?: string;
+  titleFontSize?: number;
   hideTitle?: boolean;
+  titleOffset?: { x: number; y: number };
 
   // Text
   textModifiers?: ('bold' | 'italic' | 'underline')[];
   textColor?: string;
+  textFontSize?: number;
   hideText?: boolean;
+  textOffset?: { x: number; y: number };
 
   // Tempo
   tempoModifiers?: ('bold' | 'italic' | 'underline')[];
   tempoColor?: string;
+  tempoFontSize?: number;
   hideTempo?: boolean;
+  tempoOffset?: { x: number; y: number };
+
+  // Time Signature
+  timeSignatureOffset?: { x: number; y: number };
 
   // Barlines
   startBarlineShape?: 'single' | 'double' | 'dashed' | 'end' | 'repeat-start' | 'repeat-end' | 'double-repeat';
@@ -75,26 +88,35 @@ export interface GlobalStyle {
   // Global Title
   titleModifiers?: ('bold' | 'italic' | 'underline')[];
   titleColor?: string;
+  titleFontSize?: number;
   hideTitle?: boolean;
+  
+  // Global Measure Numbers
+  startMeasureFontSize?: number;
+  measureRangeFontSize?: number;
 
   // Global Subtitle
   subtitleModifiers?: ('bold' | 'italic' | 'underline')[];
   subtitleColor?: string;
+  subtitleFontSize?: number;
   hideSubtitle?: boolean;
 
   // Composer
   composerModifiers?: ('bold' | 'italic' | 'underline')[];
   composerColor?: string;
+  composerFontSize?: number;
   hideComposer?: boolean;
 
   // Arranger
   arrangerModifiers?: ('bold' | 'italic' | 'underline')[];
   arrangerColor?: string;
+  arrangerFontSize?: number;
   hideArranger?: boolean;
 
   // Created By
   createdByModifiers?: ('bold' | 'italic' | 'underline')[];
   createdByColor?: string;
+  createdByFontSize?: number;
   hideCreatedBy?: boolean;
 }
 

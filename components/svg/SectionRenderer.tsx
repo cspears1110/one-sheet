@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PositionedSection, calculateTimeSigGap, wrapText } from '../../lib/layout';
+import { PositionedSection, calculateTimeSigGap, wrapText, getSectionVerticalLayout } from '../../lib/layout';
 import { Section } from '../../lib/types';
 import { useStore, ActiveSelectionType } from '../../lib/store';
 import { BravuraPaths } from '../../lib/bravura-paths';
@@ -19,7 +19,8 @@ interface Props {
 
 export function SectionRenderer({ positioned, level = 1, isFirstChild = false, isLastChild = true, skipStartBarline = false, absX, absY, onReparentAnnotation }: Props) {
     const { section, x, y, width } = positioned;
-    const { activeSelection, setActiveSelection, updateCompositionAndSync } = useStore();
+    const { composition, activeSelection, setActiveSelection, updateCompositionAndSync } = useStore();
+    const globalStyle = composition.style || {};
 
     const [draggingAnnotation, setDraggingAnnotation] = useState<string | null>(null);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -189,7 +190,8 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
         const currentStyle = section.style || {};
         const modifiers = currentStyle.tempoModifiers || ['bold'];
         
-        let fontStr = '14px sans-serif';
+        const tempoFontSize = currentStyle.tempoFontSize || 14;
+        let fontStr = `${tempoFontSize}px sans-serif`;
         if (modifiers.includes('bold') && modifiers.includes('italic')) fontStr = 'bold italic ' + fontStr;
         else if (modifiers.includes('bold')) fontStr = 'bold ' + fontStr;
         else if (modifiers.includes('italic')) fontStr = 'italic ' + fontStr;
@@ -398,6 +400,7 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
     const curlyPath = `M 0,${braceHeight} Q 0,0 ${curve},0 L ${width / 2 - curve},0 Q ${width / 2},0 ${width / 2},${-braceHeight} Q ${width / 2},0 ${width / 2 + curve},0 L ${width - curve},0 Q ${width},0 ${width},${braceHeight}`;
 
     const baseBraceHeight = braceHeight;
+    const vLayout = getSectionVerticalLayout(section, width);
 
     const renderResolvedBrace = () => {
         if (currentStyle.braceShape === 'none') return null;
@@ -507,7 +510,7 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                     <g
                         transform="translate(8, -40)"
                         fill={isSelected('tempo') ? '#2563eb' : (hideTempo ? '#d1d5db' : tempoColor)}
-                        fontSize={14}
+                        fontSize={currentStyle.tempoFontSize || 14}
                         fontFamily="sans-serif"
                         {...getFontStyle(currentStyle.tempoModifiers || ['bold'])}
                         style={getFontStyle(currentStyle.tempoModifiers || ['bold'])}
@@ -521,11 +524,20 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
             {/* Start Measure Number Interactive Group */}
             {!isFirstChild && !hideStartMeasure && (() => {
                 const smText = section.startMeasureLabel || positioned.startMeasure.toString();
-                const smFont = (currentStyle.startMeasureTextModifiers || ['bold']).includes('bold') ? 'bold 12px sans-serif' : '12px sans-serif';
+                const fontSize = currentStyle.startMeasureFontSize || globalStyle.startMeasureFontSize || 11;
+                const smFont = (currentStyle.startMeasureTextModifiers || ['bold']).includes('bold') ? `bold ${fontSize}px sans-serif` : `${fontSize}px sans-serif`;
                 const smWidth = measureTextWidth(smText, smFont);
                 const hasShape = currentStyle.startMeasureShape === 'circle' || currentStyle.startMeasureShape === 'square';
-                const dynamicShapeWidth = hasShape ? Math.max(24, smWidth + 12) : smWidth;
+                
+                // Scale factors
+                const scale = fontSize / 11;
+                const shapePadding = 12 * scale;
+                const dynamicShapeWidth = hasShape ? Math.max(24 * scale, smWidth + shapePadding) : smWidth;
+                const dynamicShapeHeight = fontSize + (8 * scale);
+                
                 const centerX = dynamicShapeWidth / 2;
+                const baseY = isCurlyBrace ? -16 : -4;
+                const shapeY = baseY - (fontSize * 0.8) - (4 * scale);
 
                 return (
                     <g
@@ -533,14 +545,14 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                         onClick={(e) => handleClick(e, 'startMeasure')}
                         transform={(!isCurlyBrace && hasShape) ? `translate(0, -8)` : undefined}
                     >
-                        <rect x={-4} y={isCurlyBrace ? -26 : -14} width={dynamicShapeWidth + 8} height={14} fill="transparent" />
+                        <rect x={-4} y={shapeY - 4} width={dynamicShapeWidth + 8} height={dynamicShapeHeight + 8} fill="transparent" />
 
                         {currentStyle.startMeasureShape === 'circle' && (
                             <ellipse
                                 cx={centerX}
-                                cy={isCurlyBrace ? -20 : -8}
+                                cy={shapeY + (dynamicShapeHeight / 2)}
                                 rx={dynamicShapeWidth / 2}
-                                ry={12}
+                                ry={dynamicShapeHeight / 2}
                                 fill="white"
                                 stroke={isSelected('startMeasure') ? '#2563eb' : (hideStartMeasure ? '#d1d5db' : startMeasureColor)}
                                 strokeWidth={(currentStyle.startMeasureTextModifiers || ['bold']).includes('bold') ? 1.5 : 1}
@@ -549,9 +561,9 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                         {currentStyle.startMeasureShape === 'square' && (
                             <rect
                                 x={0}
-                                y={isCurlyBrace ? -32 : -20}
+                                y={shapeY}
                                 width={dynamicShapeWidth}
-                                height={24}
+                                height={dynamicShapeHeight}
                                 fill="white"
                                 stroke={isSelected('startMeasure') ? '#2563eb' : (hideStartMeasure ? '#d1d5db' : startMeasureColor)}
                                 strokeWidth={(currentStyle.startMeasureTextModifiers || ['bold']).includes('bold') ? 1.5 : 1}
@@ -560,9 +572,9 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
 
                         <text
                             x={centerX}
-                            y={isCurlyBrace ? -16 : -4}
+                            y={baseY}
                             fill={isSelected('startMeasure') ? '#2563eb' : (hideStartMeasure ? '#d1d5db' : startMeasureColor)}
-                            fontSize={12}
+                            fontSize={fontSize}
                             fontFamily="sans-serif"
                             textAnchor="middle"
                             {...getFontStyle(currentStyle.startMeasureTextModifiers || ['bold'])}
@@ -577,17 +589,20 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
             {/* Start and End Measure Range Interactive Group */}
             {measureCount > 0 && (() => {
                 const measureRangeX = width / 2;
+                const fontSize = currentStyle.measureRangeFontSize || globalStyle.measureRangeFontSize || 11;
+                const baseY = isCurlyBrace ? -16 : -4;
+
                 return (
                     <g
                         className={`cursor-pointer group ${hideMeasureRange ? 'print:hidden' : ''}`}
                         onClick={(e) => handleClick(e, 'measureRange')}
                     >
-                        <rect x={measureRangeX - 20} y={isCurlyBrace ? -26 : -14} width={40} height={14} fill="transparent" />
+                        <rect x={measureRangeX - 25} y={baseY - fontSize - 2} width={50} height={fontSize + 6} fill="transparent" />
                         <text
                             x={measureRangeX}
-                            y={isCurlyBrace ? -16 : -4}
+                            y={baseY}
                             fill={isSelected('measureRange') ? '#2563eb' : (hideMeasureRange ? '#d1d5db' : measureRangeColor)}
-                            fontSize={12}
+                            fontSize={fontSize}
                             fontFamily="sans-serif"
                             textAnchor="middle"
                             {...getFontStyle(currentStyle.measureRangeTextModifiers)}
@@ -636,14 +651,14 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                         x={section.timeSignature ? calculateTimeSigGap(section.timeSignature) : 4}
                         y={8}
                         width={Math.max(120, width - (section.timeSignature ? calculateTimeSigGap(section.timeSignature) : 4) + 40)}
-                        height={18}
+                        height={vLayout.titleY + 6}
                         fill="transparent"
                     />
                     <text
                         x={section.timeSignature ? calculateTimeSigGap(section.timeSignature) + 4 : 8}
-                        y={24}
+                        y={vLayout.titleY}
                         fill={isSelected('title') ? '#2563eb' : (hideTitle ? '#d1d5db' : titleColor)}
-                        fontSize={14}
+                        fontSize={currentStyle.titleFontSize || 14}
                         fontFamily="sans-serif"
                         {...getFontStyle(currentStyle.titleModifiers || ['bold'])}
                         style={getFontStyle(currentStyle.titleModifiers || ['bold'])}
@@ -653,24 +668,36 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                 </g>
             )}
 
-            {/* Optional Section Text underneath Title (or replacing it if empty) */}
             {section.text && (
                 <g
                     className={`cursor-pointer group ${hideText ? 'print:hidden' : ''}`}
                     onClick={(e) => handleClick(e, 'text')}
                 >
-                    <rect x={section.timeSignature ? calculateTimeSigGap(section.timeSignature) : 4} y={section.title ? 26 : 8} width={width - (section.timeSignature ? calculateTimeSigGap(section.timeSignature) : 4)} height={16} fill="transparent" />
+                    {(() => {
+                        const timeSigGap = calculateTimeSigGap(section.timeSignature);
+                        const { lines } = wrapText(section.text!, width - timeSigGap - 16, `${currentStyle.textFontSize || 12}px sans-serif`);
+                        const totalTextHeight = Math.max(16, lines.length * vLayout.textLineHeight);
+                        return (
+                            <rect 
+                                x={section.timeSignature ? timeSigGap : 4} 
+                                y={section.title ? vLayout.titleY + 2 : 8} 
+                                width={width - timeSigGap} 
+                                height={totalTextHeight} 
+                                fill="transparent" 
+                            />
+                        );
+                    })()}
                     <text
                         x={section.timeSignature ? calculateTimeSigGap(section.timeSignature) + 4 : 8}
-                        y={section.title ? 40 : 24}
+                        y={vLayout.textY}
                         fill={isSelected('text') ? '#3b82f6' : (hideText ? '#d1d5db' : textColor)}
-                        fontSize={12}
+                        fontSize={currentStyle.textFontSize || 12}
                         fontFamily="sans-serif"
                         {...getFontStyle(currentStyle.textModifiers)}
                         style={getFontStyle(currentStyle.textModifiers)}
                     >
-                        {wrapText(section.text, width - calculateTimeSigGap(section.timeSignature) - 16).lines.map((lineStr, i) => (
-                            <tspan key={i} x={section.timeSignature ? calculateTimeSigGap(section.timeSignature) + 4 : 8} dy={i === 0 ? 0 : 16}>
+                        {wrapText(section.text, width - calculateTimeSigGap(section.timeSignature) - 16, `${currentStyle.textFontSize || 12}px sans-serif`).lines.map((lineStr, i) => (
+                            <tspan key={i} x={section.timeSignature ? calculateTimeSigGap(section.timeSignature) + 4 : 8} dy={i === 0 ? 0 : vLayout.textLineHeight}>
                                 {lineStr || '\u00A0'}
                             </tspan>
                         ))}

@@ -4,11 +4,21 @@ import { PageSize, PageOrientation } from '../lib/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { useTheme } from 'next-themes';
 
 export function SettingsEditor() {
-    const { pageConfig, setPageConfig, showRawTextEditor, setShowRawTextEditor } = useStore();
+    const { composition, updateCompositionAndSync, pageConfig, setPageConfig, showRawTextEditor, setShowRawTextEditor } = useStore();
     const { theme, setTheme } = useTheme();
+
+    const updateGlobalStyle = (patch: any) => {
+        updateCompositionAndSync((prev: any) => {
+            const newComp = JSON.parse(JSON.stringify(prev));
+            newComp.style = { ...(newComp.style || {}), ...patch };
+            return newComp;
+        });
+    };
 
     return (
         <div className="flex flex-col space-y-6">
@@ -57,6 +67,36 @@ export function SettingsEditor() {
                                 <TabsTrigger value="dark">Dark</TabsTrigger>
                             </TabsList>
                         </Tabs>
+                    </div>
+
+                    <div className="space-y-4 pt-4 border-t border-border">
+                        <label className="text-xs font-semibold text-muted-foreground block">Global Typography</label>
+                        <div className="grid grid-cols-2 gap-4 pt-2">
+                            <div className="space-y-1.5">
+                                <Label className="text-[10px] font-semibold text-muted-foreground uppercase">Start Measure Font</Label>
+                                <Input
+                                    type="number"
+                                    className="h-8 text-xs text-center"
+                                    value={composition.style?.startMeasureFontSize ?? 12}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        updateGlobalStyle({ startMeasureFontSize: val ? parseInt(val, 10) : undefined });
+                                    }}
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label className="text-[10px] font-semibold text-muted-foreground uppercase">Range Font</Label>
+                                <Input
+                                    type="number"
+                                    className="h-8 text-xs text-center"
+                                    value={composition.style?.measureRangeFontSize ?? 11}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        updateGlobalStyle({ measureRangeFontSize: val ? parseInt(val, 10) : undefined });
+                                    }}
+                                />
+                            </div>
+                        </div>
                     </div>
 
                     <div className="space-y-4 pt-4 border-t border-border">

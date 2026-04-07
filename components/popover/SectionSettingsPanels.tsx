@@ -39,10 +39,24 @@ export function StartMeasurePanel({ style, updateStyle, startMeasureLabel, updat
                 </Select>
             </div>
 
-            <TextModifiers
-                value={style.startMeasureTextModifiers || ['bold']}
-                onChange={(val) => updateStyle({ startMeasureTextModifiers: val })}
-            />
+            <div className="flex items-center gap-2">
+                <TextModifiers
+                    value={style.startMeasureTextModifiers || ['bold']}
+                    onChange={(val) => updateStyle({ startMeasureTextModifiers: val })}
+                />
+                <div className="flex-1 flex items-center justify-end gap-1.5">
+                    <Label className="text-[10px] font-semibold text-muted-foreground uppercase">Font Size</Label>
+                    <Input
+                        type="number"
+                        className="h-8 w-24 text-xs text-center"
+                        value={style.startMeasureFontSize ?? 12}
+                        onChange={(e) => {
+                            const val = e.target.value;
+                            updateStyle({ startMeasureFontSize: val ? parseInt(val, 10) : undefined });
+                        }}
+                    />
+                </div>
+            </div>
 
             <div className="space-y-2">
                 <Label className="text-xs font-semibold">Custom Label</Label>
@@ -77,10 +91,24 @@ export function StartMeasurePanel({ style, updateStyle, startMeasureLabel, updat
 export function MeasureRangePanel({ style, updateStyle, showMeasureCount, measureRangeLabel, updateSection, onToggleShowMeasureCount }: SettingPanelProps & { showMeasureCount: boolean; measureRangeLabel: string; updateSection: (p: Partial<Section>) => void; onToggleShowMeasureCount: (v: boolean) => void }) {
     return (
         <div className="space-y-4">
-            <TextModifiers
-                value={style.measureRangeTextModifiers || []}
-                onChange={(val) => updateStyle({ measureRangeTextModifiers: val })}
-            />
+            <div className="flex items-center gap-2">
+                <TextModifiers
+                    value={style.measureRangeTextModifiers || []}
+                    onChange={(val) => updateStyle({ measureRangeTextModifiers: val })}
+                />
+                <div className="flex-1 flex items-center justify-end gap-1.5">
+                    <Label className="text-[10px] font-semibold text-muted-foreground uppercase">Font Size</Label>
+                    <Input
+                        type="number"
+                        className="h-8 w-24 text-xs text-center"
+                        value={style.measureRangeFontSize ?? 11}
+                        onChange={(e) => {
+                            const val = e.target.value;
+                            updateStyle({ measureRangeFontSize: val ? parseInt(val, 10) : undefined });
+                        }}
+                    />
+                </div>
+            </div>
 
             <div className="space-y-2">
                 <Label className="text-xs font-semibold">Custom Label</Label>
@@ -177,17 +205,17 @@ type GenericTextType = 'title' | 'text' | 'tempo';
 export function GenericTextPanel({ type, style, updateStyle, value, onUpdateValue }: SettingPanelProps & { type: GenericTextType; value: string; onUpdateValue: (val: string) => void }) {
     const config = {
         title: {
-            modifiers: 'titleModifiers', defaultModifiers: ['bold'],
+            modifiers: 'titleModifiers', fontSize: 'titleFontSize', defaultFontSize: 14, defaultModifiers: ['bold'],
             color: 'titleColor', hide: 'hideTitle', hideLabel: 'Hide Title',
             placeholder: 'Enter Title...'
         },
         text: {
-            modifiers: 'textModifiers', defaultModifiers: [],
+            modifiers: 'textModifiers', fontSize: 'textFontSize', defaultFontSize: 12, defaultModifiers: [],
             color: 'textColor', hide: 'hideText', hideLabel: 'Hide Text Context',
             placeholder: 'Enter Text...'
         },
         tempo: {
-            modifiers: 'tempoModifiers', defaultModifiers: ['bold'],
+            modifiers: 'tempoModifiers', fontSize: 'tempoFontSize', defaultFontSize: 14, defaultModifiers: ['bold'],
             color: 'tempoColor', hide: 'hideTempo', hideLabel: 'Hide Tempo',
             placeholder: 'ex. Allegro q=120'
         }
@@ -197,10 +225,24 @@ export function GenericTextPanel({ type, style, updateStyle, value, onUpdateValu
 
     return (
         <div className="space-y-4">
-            <TextModifiers
-                value={(style as any)[c.modifiers] || c.defaultModifiers}
-                onChange={(val) => updateStyle({ [c.modifiers]: val })}
-            />
+            <div className="flex items-center gap-2">
+                <TextModifiers
+                    value={(style as any)[c.modifiers] || c.defaultModifiers}
+                    onChange={(val) => updateStyle({ [c.modifiers]: val })}
+                />
+                <div className="flex-1 flex items-center justify-end gap-1.5">
+                    <Label className="text-[10px] font-semibold text-muted-foreground uppercase">Font Size</Label>
+                    <Input
+                        type="number"
+                        className="h-8 w-24 text-xs text-center"
+                        value={(style as any)[c.fontSize] ?? c.defaultFontSize}
+                        onChange={(e) => {
+                            const val = e.target.value;
+                            updateStyle({ [c.fontSize]: val ? parseInt(val, 10) : undefined });
+                        }}
+                    />
+                </div>
+            </div>
 
             <div className="space-y-2">
                 <div className="flex items-center gap-1.5">

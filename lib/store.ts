@@ -11,6 +11,7 @@ export interface ActiveSelection {
     type: ActiveSelectionType;
     annotationId?: string;
     rect?: DOMRect;
+    source?: 'canvas' | 'form';
 }
 
 export interface AppState {

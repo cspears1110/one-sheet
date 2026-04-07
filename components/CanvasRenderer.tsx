@@ -68,7 +68,7 @@ export function CanvasRenderer() {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [activeSelection, updateCompositionAndSync, setActiveSelection]);
 
-    const currentConfig = useMemo(() => getLayoutConfig(pageConfig), [pageConfig]);
+    const currentConfig = useMemo(() => getLayoutConfig(pageConfig, composition.style), [pageConfig, composition.style]);
 
     const { layoutStaves, scale, logicalConfig } = useMemo(() => {
         const initialStaves = computeLayout(composition, currentConfig);

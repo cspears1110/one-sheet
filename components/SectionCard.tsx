@@ -78,6 +78,7 @@ export function SectionCard({ item, depth, index, isCollapsed, hasChildren, isAc
 
     return (
         <div
+            id={`section-${item.id}`}
             style={style}
             data-section-card={true}
             onClick={(e) => {

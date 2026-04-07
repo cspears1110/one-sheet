@@ -16,21 +16,35 @@ export interface GlobalTextPanelProps {
 
 export function GlobalTextPanel({ type, composition, style, updateStyle, updateText }: GlobalTextPanelProps) {
     const globalKeyMap = {
-        'globalTitle': { text: 'title', modifiers: 'titleModifiers', color: 'titleColor', hide: 'hideTitle', defaultModifiers: ['bold'] as ('bold' | 'italic' | 'underline')[] },
-        'globalSubtitle': { text: 'subtitle', modifiers: 'subtitleModifiers', color: 'subtitleColor', hide: 'hideSubtitle', defaultModifiers: ['italic'] as ('bold' | 'italic' | 'underline')[] },
-        'globalComposer': { text: 'composer', modifiers: 'composerModifiers', color: 'composerColor', hide: 'hideComposer', defaultModifiers: [] as ('bold' | 'italic' | 'underline')[] },
-        'globalArranger': { text: 'arranger', modifiers: 'arrangerModifiers', color: 'arrangerColor', hide: 'hideArranger', defaultModifiers: ['italic'] as ('bold' | 'italic' | 'underline')[] },
-        'globalCreatedBy': { text: 'createdBy', modifiers: 'createdByModifiers', color: 'createdByColor', hide: 'hideCreatedBy', defaultModifiers: ['italic'] as ('bold' | 'italic' | 'underline')[] }
+        'globalTitle': { text: 'title', modifiers: 'titleModifiers', fontSize: 'titleFontSize', defaultFontSize: 28, color: 'titleColor', hide: 'hideTitle', defaultModifiers: ['bold'] as ('bold' | 'italic' | 'underline')[] },
+        'globalSubtitle': { text: 'subtitle', modifiers: 'subtitleModifiers', fontSize: 'subtitleFontSize', defaultFontSize: 20, color: 'subtitleColor', hide: 'hideSubtitle', defaultModifiers: ['italic'] as ('bold' | 'italic' | 'underline')[] },
+        'globalComposer': { text: 'composer', modifiers: 'composerModifiers', fontSize: 'composerFontSize', defaultFontSize: 16, color: 'composerColor', hide: 'hideComposer', defaultModifiers: [] as ('bold' | 'italic' | 'underline')[] },
+        'globalArranger': { text: 'arranger', modifiers: 'arrangerModifiers', fontSize: 'arrangerFontSize', defaultFontSize: 14, color: 'arrangerColor', hide: 'hideArranger', defaultModifiers: ['italic'] as ('bold' | 'italic' | 'underline')[] },
+        'globalCreatedBy': { text: 'createdBy', modifiers: 'createdByModifiers', fontSize: 'createdByFontSize', defaultFontSize: 14, color: 'createdByColor', hide: 'hideCreatedBy', defaultModifiers: ['italic'] as ('bold' | 'italic' | 'underline')[] }
     } as const;
 
     const mapping = globalKeyMap[type];
 
     return (
         <div className="space-y-4">
-            <TextModifiers
-                value={(style as any)[mapping.modifiers] || mapping.defaultModifiers}
-                onChange={(val) => updateStyle({ [mapping.modifiers]: val })}
-            />
+            <div className="flex items-center gap-2">
+                <TextModifiers
+                    value={(style as any)[mapping.modifiers] || mapping.defaultModifiers}
+                    onChange={(val) => updateStyle({ [mapping.modifiers]: val })}
+                />
+                <div className="flex-1 flex items-center justify-end gap-1.5">
+                    <Label className="text-[10px] font-semibold text-muted-foreground uppercase">Font Size</Label>
+                    <Input
+                        type="number"
+                        className="h-8 w-24 text-xs text-center"
+                        value={(style as any)[mapping.fontSize] ?? mapping.defaultFontSize}
+                        onChange={(e) => {
+                            const val = e.target.value;
+                            updateStyle({ [mapping.fontSize]: val ? parseInt(val, 10) : undefined });
+                        }}
+                    />
+                </div>
+            </div>
 
             <div className="space-y-2">
                 <Label className="text-xs font-semibold">Edit Text</Label>

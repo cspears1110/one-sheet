@@ -26,6 +26,7 @@ export interface LayoutConfig {
     maxHeight: number;
     baseSectionWidth: number;
     levelHeight: number;
+    globalStyle?: import('./types').GlobalStyle;
 }
 
 const PAGE_DIMENSIONS: Record<import('./types').PageSize, { width: number; height: number }> = {
@@ -34,7 +35,7 @@ const PAGE_DIMENSIONS: Record<import('./types').PageSize, { width: number; heigh
     tabloid: { width: 11 * Theme.dpi, height: 17 * Theme.dpi },
 };
 
-export function getLayoutConfig(pageConfig: import('./types').PageConfig): LayoutConfig {
+export function getLayoutConfig(pageConfig: import('./types').PageConfig, globalStyle?: import('./types').GlobalStyle): LayoutConfig {
     const dims = PAGE_DIMENSIONS[pageConfig.size];
 
     // Determine effective width based on orientation, subtracting margins
@@ -50,6 +51,7 @@ export function getLayoutConfig(pageConfig: import('./types').PageConfig): Layou
         maxHeight,
         baseSectionWidth: Theme.layout.baseSectionWidth,
         levelHeight: Theme.layout.levelHeight,
+        globalStyle
     };
 }
 
@@ -76,6 +78,48 @@ export function calculateTimeSigGap(timeSig?: string): number {
         }
     });
     return gap;
+}
+
+export interface SectionVerticalLayout {
+    titleY: number;
+    textY: number;
+    textLineHeight: number;
+    headerHeight: number;
+}
+
+export function getSectionVerticalLayout(section: Section, width: number): SectionVerticalLayout {
+    const style = section.style || {};
+    const titleSize = style.titleFontSize || 14;
+    const textSize = style.textFontSize || 12;
+    
+    // Padding above the title baseline
+    const titleY = titleSize + 8;
+    
+    // If we have a title, text starts below it. If not, text starts near the top.
+    const textY = section.title ? titleY + 12 : 8 + textSize;
+    const textLineHeight = Math.max(14, textSize * 1.3);
+    
+    let textFullHeight = 0;
+    if (section.text) {
+        const timeSigGap = calculateTimeSigGap(section.timeSignature);
+        const { lines } = wrapText(section.text, width - timeSigGap - 16, `${textSize}px sans-serif`);
+        textFullHeight = lines.length * textLineHeight;
+    }
+    
+    // headerHeight must contain:
+    // 1. Title (if exists)
+    // 2. Text (if exists)
+    // 3. A buffer for children's "top" elements (Measure numbers @ -16, Tempo @ -40)
+    // We'll reserve space for descenders (approx 30% of font size) + a generous buffer
+    const contentBottom = section.text ? textY + textFullHeight : (section.title ? titleY + (titleSize * 0.25) : 0);
+    const headerHeight = Math.max(Theme.layout.levelHeight, contentBottom + 36);
+    
+    return {
+        titleY,
+        textY,
+        textLineHeight,
+        headerHeight
+    };
 }
 
 // Helper to wrap text into lines using precise canvas measurements.
@@ -125,6 +169,7 @@ export function calculateMeasureCount(section: Section, inferredEnd?: number): n
 // Helper to determine the minimum dimensions required for a section subtree
 function calculateMinDimensions(section: Section, config: LayoutConfig, inferredEnd?: number): { width: number; depth: number } {
     const style = section.style || {};
+    const globalStyle = config.globalStyle || {};
     const hasShape = style.startMeasureShape === 'circle' || style.startMeasureShape === 'square';
     const timeSigGap = calculateTimeSigGap(section.timeSignature);
     
@@ -132,12 +177,16 @@ function calculateMinDimensions(section: Section, config: LayoutConfig, inferred
     let startMeasureFootprint = 0;
     if (!style.hideStartMeasure) {
         const smText = section.startMeasureLabel || section.startMeasure.toString();
-        const font = style.startMeasureTextModifiers?.includes('bold') ? 'bold 12px sans-serif' : '12px sans-serif';
+        const fontSize = style.startMeasureFontSize || globalStyle.startMeasureFontSize || 12;
+        const font = style.startMeasureTextModifiers?.includes('bold') ? `bold ${fontSize}px sans-serif` : `${fontSize}px sans-serif`;
         const textWidth = measureTextWidth(smText, font);
 
         if (hasShape) {
             // Shapes have a minimum baseline width and extra padding
-            startMeasureFootprint = Math.max(Theme.layout.startMeasureShapeWidth, textWidth + 12);
+            // Scale padding and base width with font size
+            const scale = fontSize / 12;
+            const shapePadding = 12 * scale;
+            startMeasureFootprint = Math.max(Theme.layout.startMeasureShapeWidth * scale, textWidth + shapePadding);
         } else {
             startMeasureFootprint = textWidth;
         }
@@ -151,7 +200,8 @@ function calculateMinDimensions(section: Section, config: LayoutConfig, inferred
             (endM - section.startMeasure + 1).toString() : 
             `${section.startMeasure}-${endM}`);
         
-        const font = style.measureRangeTextModifiers?.includes('bold') ? 'bold 11px sans-serif' : '11px sans-serif';
+        const fontSize = style.measureRangeFontSize || globalStyle.measureRangeFontSize || 11;
+        const font = style.measureRangeTextModifiers?.includes('bold') ? `bold ${fontSize}px sans-serif` : `${fontSize}px sans-serif`;
         rangeStrWidth = measureTextWidth(rangeText, font);
     }
 
@@ -165,15 +215,18 @@ function calculateMinDimensions(section: Section, config: LayoutConfig, inferred
 
     // 4. Calculate Title Width
     const titleText = section.title || '';
-    const titleFont = style.titleModifiers?.includes('bold') ? 'bold 13px sans-serif' : '13px sans-serif';
+    const titleSize = style.titleFontSize || 13;
+    const titleFont = style.titleModifiers?.includes('bold') ? `bold ${titleSize}px sans-serif` : `${titleSize}px sans-serif`;
     const titleWidth = measureTextWidth(titleText, titleFont);
 
     // Title is pushed by time signature in the renderer
-    const titleRequirement = timeSigGap + titleWidth + 20;
+    // Added a more generous buffer (36) to prevent collision with right barline
+    const titleRequirement = timeSigGap + titleWidth + 36;
 
     // 5. Add additional width for annotations and tempo
     const annotationsWidth = section.annotations.length > 0 ? 50 : 0;
-    const tempoFont = style.tempoModifiers?.includes('bold') ? 'bold 14px sans-serif' : '14px sans-serif';
+    const tempoSize = style.tempoFontSize || 14;
+    const tempoFont = style.tempoModifiers?.includes('bold') ? `bold ${tempoSize}px sans-serif` : `${tempoSize}px sans-serif`;
     
     // The SVGs for tempo notes are quite wide. If we just measure the string "[q]", we under-report.
     const tempoWidth = section.tempo 
@@ -189,8 +242,9 @@ function calculateMinDimensions(section: Section, config: LayoutConfig, inferred
         // Try wrapping the text using a max pixel width (e.g., config.baseSectionWidth or remaining width)
         const wrapperMaxWidth = Math.max(selfMinWidth, config.baseSectionWidth * 1.5);
         const { actualMaxWidth } = wrapText(section.text, wrapperMaxWidth);
-        if (actualMaxWidth + timeSigGap + 16 > selfMinWidth) {
-            selfMinWidth = actualMaxWidth + timeSigGap + 16;
+        // Added a more generous buffer (30) to prevent collision with right barline
+        if (actualMaxWidth + timeSigGap + 30 > selfMinWidth) {
+            selfMinWidth = actualMaxWidth + timeSigGap + 30;
         }
     }
 
@@ -233,14 +287,8 @@ function layoutSectionCoordinates(
     config: LayoutConfig,
     inferredEndMeasure?: number
 ): PositionedSection {
-    let textHeightOffset = 0;
-    if (section.text) {
-        const { lines } = wrapText(section.text, assignedWidth - calculateTimeSigGap(section.timeSignature) - 16);
-        // Multiply by line height (16px) + extra padding
-        textHeightOffset = lines.length * 16 + 8;
-    }
-
-    const baseHeight = config.levelHeight + textHeightOffset;
+    const vLayout = getSectionVerticalLayout(section, assignedWidth);
+    const baseHeight = vLayout.headerHeight;
 
     const positioned: PositionedSection = {
         section,
@@ -280,8 +328,9 @@ function layoutSectionCoordinates(
         const remainingSpace = Math.max(0, assignedWidth - sumMins);
 
         // Check if any child section has a tempo marking to inject vertical margin
-        const anyChildHasTempo = section.subSections.some(sub => sub.tempo);
-        const yOffsetForChildren = baseHeight + (anyChildHasTempo ? 30 : 0);
+        const maxChildTempoFontSize = Math.max(0, ...section.subSections.map(sub => sub.style?.tempoFontSize || (sub.tempo ? 14 : 0)));
+        const childTempoBuffer = maxChildTempoFontSize > 0 ? Math.max(30, maxChildTempoFontSize + 16) : 0;
+        const yOffsetForChildren = baseHeight + childTempoBuffer;
 
         positioned.height = yOffsetForChildren; // Ensure the vertical black line extends exactly to the children
 
@@ -365,8 +414,9 @@ export function computeLayout(composition: Composition, config: LayoutConfig): S
 
         // If any top-level section in this staff has a tempo marking, we need extra top margin
         // so it doesn't collide with the header or the staff above it.
-        const hasTempo = currentStaffSections.some(s => s.section.tempo);
-        const tempoPadding = hasTempo ? Theme.layout.tempoPadding : 0;
+        const maxTempoFontSize = Math.max(0, ...currentStaffSections.map(s => s.section.style?.tempoFontSize || (s.section.tempo ? 14 : 0)));
+        const hasTempo = maxTempoFontSize > 0;
+        const tempoPadding = hasTempo ? Math.max(Theme.layout.tempoPadding, maxTempoFontSize + 26) : 0;
 
         const maxSubtreeHeight = Math.max(...currentStaffSections.map(s => s.subtreeHeight));
 
