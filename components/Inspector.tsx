@@ -136,6 +136,8 @@ export function Inspector() {
                 return (
                     <TimeSignaturePanel
                         currentTimeSignature={actualNode?.timeSignature}
+                        style={currentStyle}
+                        updateStyle={updateStyle}
                         onUpdate={(ts) => {
                             if (!actualNode) return;
                             updateCompositionAndSync((prev) => {

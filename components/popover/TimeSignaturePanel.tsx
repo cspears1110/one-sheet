@@ -1,14 +1,19 @@
 import React from 'react';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import { BravuraPaths } from '../../lib/bravura-paths';
 import { SmuflTimeSigChar } from '../svg/SmuflComponents';
+import { SectionStyle } from '../../lib/types';
+import { ResetPositionButton } from './SectionSettingsPanels';
 
 export interface TimeSignaturePanelProps {
     currentTimeSignature?: string;
+    style: Partial<SectionStyle>;
+    updateStyle: (patch: Partial<SectionStyle>) => void;
     onUpdate: (ts: string) => void;
 }
 
-export function TimeSignaturePanel({ currentTimeSignature, onUpdate }: TimeSignaturePanelProps) {
+export function TimeSignaturePanel({ currentTimeSignature, style, updateStyle, onUpdate }: TimeSignaturePanelProps) {
     const commonSignatures = ['2/2', '2/4', '3/4', '4/4', '6/8', '12/8', 'C', 'Cut'];
 
     return (
@@ -71,6 +76,11 @@ export function TimeSignaturePanel({ currentTimeSignature, onUpdate }: TimeSigna
                     );
                 })}
             </div>
+            <Separator />
+            <ResetPositionButton 
+                offset={style.timeSignatureOffset} 
+                onReset={() => updateStyle({ timeSignatureOffset: { x: 0, y: 0 } })} 
+            />
         </div>
     );
 }

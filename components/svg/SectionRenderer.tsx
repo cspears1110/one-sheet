@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { PositionedSection, calculateTimeSigGap, wrapText, getSectionVerticalLayout } from '../../lib/layout';
-import { Section } from '../../lib/types';
+import { Section, SectionStyle } from '../../lib/types';
 import { useStore, ActiveSelectionType } from '../../lib/store';
 import { BravuraPaths } from '../../lib/bravura-paths';
 import { measureTextWidth } from '../../lib/measure-text';
@@ -28,6 +28,9 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
     const [resizingAnnotation, setResizingAnnotation] = useState<{ id: string, type: string, startWidth: number } | null>(null);
     const [resizeStartScale, setResizeStartScale] = useState(1);
     const [resizeDragOffset, setResizeDragOffset] = useState({ dx: 0, dy: 0 });
+
+    const [draggingStructural, setDraggingStructural] = useState<ActiveSelectionType | null>(null);
+    const [structuralDragOffset, setStructuralDragOffset] = useState({ x: 0, y: 0 });
 
     const handleAnnotationPointerDown = (e: React.PointerEvent<SVGGElement>, annId: string) => {
         e.stopPropagation();
@@ -170,6 +173,87 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                 return { ...prev, sections: updateSec(prev.sections) };
             });
             setResizeDragOffset({ dx: 0, dy: 0 });
+        }
+    };
+
+    const handleStructuralPointerDown = (e: React.PointerEvent<SVGElement>, type: ActiveSelectionType) => {
+        e.stopPropagation();
+        e.currentTarget.setPointerCapture(e.pointerId);
+        setDraggingStructural(type);
+        setStructuralDragOffset({ x: 0, y: 0 });
+        setActiveSelection({ sectionId: section.id, type, rect: e.currentTarget.getBoundingClientRect() });
+    };
+
+    const handleStructuralPointerMove = (e: React.PointerEvent<SVGElement>) => {
+        if (draggingStructural) {
+            e.stopPropagation();
+            const svgElement = e.currentTarget.ownerSVGElement;
+            if (svgElement) {
+                const pt1 = svgElement.createSVGPoint();
+                pt1.x = 0; pt1.y = 0;
+                const pt2 = svgElement.createSVGPoint();
+                pt2.x = e.movementX; pt2.y = e.movementY;
+                
+                const currentTarget = e.currentTarget as unknown as SVGGraphicsElement;
+                const matrix = currentTarget.getScreenCTM()?.inverse();
+                if (matrix) {
+                    const localPt1 = pt1.matrixTransform(matrix);
+                    const localPt2 = pt2.matrixTransform(matrix);
+                    const dx = localPt2.x - localPt1.x;
+                    const dy = localPt2.y - localPt1.y;
+                    setStructuralDragOffset(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+                }
+            }
+        }
+    };
+
+    const handleStructuralPointerUp = (e: React.PointerEvent<SVGElement>, type: ActiveSelectionType) => {
+        if (draggingStructural === type) {
+            e.stopPropagation();
+            setDraggingStructural(null);
+            e.currentTarget.releasePointerCapture(e.pointerId);
+
+            const offsetKeyMap: Partial<Record<ActiveSelectionType, keyof SectionStyle>> = {
+                'title': 'titleOffset',
+                'text': 'textOffset',
+                'tempo': 'tempoOffset',
+                'timeSignature': 'timeSignatureOffset',
+                'startMeasure': 'startMeasureOffset',
+                'measureRange': 'measureRangeOffset'
+            };
+
+            const key = offsetKeyMap[type];
+            if (!key) {
+                setStructuralDragOffset({ x: 0, y: 0 });
+                return;
+            }
+
+            updateCompositionAndSync((prev) => {
+                const updateSec = (sections: Section[]): Section[] => {
+                    return sections.map(sec => {
+                        if (sec.id === section.id) {
+                            const currentStyle = sec.style || {};
+                            const currentOffset = (currentStyle as any)[key] || { x: 0, y: 0 };
+                            return { 
+                                ...sec, 
+                                style: {
+                                    ...currentStyle,
+                                    [key]: { 
+                                        x: Math.round(currentOffset.x + structuralDragOffset.x), 
+                                        y: Math.round(currentOffset.y + structuralDragOffset.y) 
+                                    }
+                                }
+                            };
+                        }
+                        if (sec.subSections.length > 0) {
+                            return { ...sec, subSections: updateSec(sec.subSections) };
+                        }
+                        return sec;
+                    });
+                };
+                return { ...prev, sections: updateSec(prev.sections) };
+            });
+            setStructuralDragOffset({ x: 0, y: 0 });
         }
     };
 
@@ -503,12 +587,15 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
             {/* Tempo Marking Interactive Group */}
             {section.tempo && (
                 <g
-                    className={`cursor-pointer group ${hideTempo ? 'print:hidden' : ''}`}
-                    onClick={(e) => handleClick(e, 'tempo')}
+                    className={`cursor-pointer group select-none ${hideTempo ? 'print:hidden' : ''}`}
+                    onPointerDown={(e) => handleStructuralPointerDown(e, 'tempo')}
+                    onPointerMove={handleStructuralPointerMove}
+                    onPointerUp={(e) => handleStructuralPointerUp(e, 'tempo')}
+                    onClick={(e) => e.stopPropagation()}
                 >
-                    <rect x={4} y={-60} width={200} height={16} fill="transparent" />
+                    <rect x={4} y={-60} width={200} height={40} fill="transparent" />
                     <g
-                        transform="translate(8, -40)"
+                        transform={`translate(${8 + (currentStyle.tempoOffset?.x || 0) + (draggingStructural === 'tempo' ? structuralDragOffset.x : 0)}, ${-40 + (currentStyle.tempoOffset?.y || 0) + (draggingStructural === 'tempo' ? structuralDragOffset.y : 0)})`}
                         fill={isSelected('tempo') ? '#2563eb' : (hideTempo ? '#d1d5db' : tempoColor)}
                         fontSize={currentStyle.tempoFontSize || 14}
                         fontFamily="sans-serif"
@@ -517,7 +604,6 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                     >
                         {formatTempoText(section.tempo)}
                     </g>
-
                 </g>
             )}
 
@@ -539,11 +625,17 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                 const baseY = isCurlyBrace ? -16 : -4;
                 const shapeY = baseY - (fontSize * 0.8) - (4 * scale);
 
+                const currentXOffset = (currentStyle.startMeasureOffset?.x || 0) + (draggingStructural === 'startMeasure' ? structuralDragOffset.x : 0);
+                const currentYOffset = (currentStyle.startMeasureOffset?.y || 0) + (draggingStructural === 'startMeasure' ? structuralDragOffset.y : 0);
+
                 return (
                     <g
-                        className={`cursor-pointer group ${isSelected('startMeasure') ? 'text-blue-600' : ''}`}
-                        onClick={(e) => handleClick(e, 'startMeasure')}
-                        transform={(!isCurlyBrace && hasShape) ? `translate(0, -8)` : undefined}
+                        className={`cursor-pointer group select-none ${isSelected('startMeasure') ? 'text-blue-600' : ''}`}
+                        onPointerDown={(e) => handleStructuralPointerDown(e, 'startMeasure')}
+                        onPointerMove={handleStructuralPointerMove}
+                        onPointerUp={(e) => handleStructuralPointerUp(e, 'startMeasure')}
+                        onClick={(e) => e.stopPropagation()}
+                        transform={`translate(${currentXOffset}, ${currentYOffset}) ${(!isCurlyBrace && hasShape) ? 'translate(0, -8)' : ''}`}
                     >
                         <rect x={-4} y={shapeY - 4} width={dynamicShapeWidth + 8} height={dynamicShapeHeight + 8} fill="transparent" />
 
@@ -591,11 +683,18 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                 const measureRangeX = width / 2;
                 const fontSize = currentStyle.measureRangeFontSize || globalStyle.measureRangeFontSize || 11;
                 const baseY = isCurlyBrace ? -16 : -4;
+                
+                const currentXOffset = (currentStyle.measureRangeOffset?.x || 0) + (draggingStructural === 'measureRange' ? structuralDragOffset.x : 0);
+                const currentYOffset = (currentStyle.measureRangeOffset?.y || 0) + (draggingStructural === 'measureRange' ? structuralDragOffset.y : 0);
 
                 return (
                     <g
-                        className={`cursor-pointer group ${hideMeasureRange ? 'print:hidden' : ''}`}
-                        onClick={(e) => handleClick(e, 'measureRange')}
+                        className={`cursor-pointer group select-none ${hideMeasureRange ? 'print:hidden' : ''}`}
+                        onPointerDown={(e) => handleStructuralPointerDown(e, 'measureRange')}
+                        onPointerMove={handleStructuralPointerMove}
+                        onPointerUp={(e) => handleStructuralPointerUp(e, 'measureRange')}
+                        onClick={(e) => e.stopPropagation()}
+                        transform={`translate(${currentXOffset}, ${currentYOffset})`}
                     >
                         <rect x={measureRangeX - 25} y={baseY - fontSize - 2} width={50} height={fontSize + 6} fill="transparent" />
                         <text
@@ -633,8 +732,12 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
             {/* Time Signature Interactive Group */}
             {section.timeSignature && (
                 <g
-                    className="cursor-pointer group"
-                    onClick={(e) => handleClick(e, 'timeSignature')}
+                    className="cursor-pointer group select-none"
+                    onPointerDown={(e) => handleStructuralPointerDown(e, 'timeSignature')}
+                    onPointerMove={handleStructuralPointerMove}
+                    onPointerUp={(e) => handleStructuralPointerUp(e, 'timeSignature')}
+                    onClick={(e) => e.stopPropagation()}
+                    transform={`translate(${(currentStyle.timeSignatureOffset?.x || 0) + (draggingStructural === 'timeSignature' ? structuralDragOffset.x : 0)}, ${(currentStyle.timeSignatureOffset?.y || 0) + (draggingStructural === 'timeSignature' ? structuralDragOffset.y : 0)})`}
                 >
                     <rect x={14} y={-2} width={calculateTimeSigGap(section.timeSignature) - 10} height={30} fill="transparent" />
                     {renderTimeSignature(section.timeSignature, isSelected('timeSignature'))}
@@ -644,8 +747,12 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
             {/* Title Interactive Group */}
             {section.title && (
                 <g
-                    className={`cursor-pointer group ${hideTitle ? 'print:hidden' : ''}`}
-                    onClick={(e) => handleClick(e, 'title')}
+                    className={`cursor-pointer group select-none ${hideTitle ? 'print:hidden' : ''}`}
+                    onPointerDown={(e) => handleStructuralPointerDown(e, 'title')}
+                    onPointerMove={handleStructuralPointerMove}
+                    onPointerUp={(e) => handleStructuralPointerUp(e, 'title')}
+                    onClick={(e) => e.stopPropagation()}
+                    transform={`translate(${(currentStyle.titleOffset?.x || 0) + (draggingStructural === 'title' ? structuralDragOffset.x : 0)}, ${(currentStyle.titleOffset?.y || 0) + (draggingStructural === 'title' ? structuralDragOffset.y : 0)})`}
                 >
                     <rect
                         x={section.timeSignature ? calculateTimeSigGap(section.timeSignature) : 4}
@@ -670,8 +777,12 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
 
             {section.text && (
                 <g
-                    className={`cursor-pointer group ${hideText ? 'print:hidden' : ''}`}
-                    onClick={(e) => handleClick(e, 'text')}
+                    className={`cursor-pointer group select-none ${hideText ? 'print:hidden' : ''}`}
+                    onPointerDown={(e) => handleStructuralPointerDown(e, 'text')}
+                    onPointerMove={handleStructuralPointerMove}
+                    onPointerUp={(e) => handleStructuralPointerUp(e, 'text')}
+                    onClick={(e) => e.stopPropagation()}
+                    transform={`translate(${(currentStyle.textOffset?.x || 0) + (draggingStructural === 'text' ? structuralDragOffset.x : 0)}, ${(currentStyle.textOffset?.y || 0) + (draggingStructural === 'text' ? structuralDragOffset.y : 0)})`}
                 >
                     {(() => {
                         const timeSigGap = calculateTimeSigGap(section.timeSignature);

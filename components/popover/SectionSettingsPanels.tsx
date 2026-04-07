@@ -19,6 +19,23 @@ export interface SettingPanelProps {
     updateStyle: (patch: Partial<SectionStyle>) => void;
 }
 
+export function ResetPositionButton({ offset, onReset }: { offset?: { x: number; y: number }, onReset: () => void }) {
+    const hasOffset = offset && (offset.x !== 0 || offset.y !== 0);
+    return (
+        <button
+            disabled={!hasOffset}
+            onClick={onReset}
+            className={`w-full h-8 text-[10px] font-bold uppercase tracking-wider rounded border transition-colors ${
+                hasOffset 
+                ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100' 
+                : 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed opacity-50'
+            }`}
+        >
+            Reset Position
+        </button>
+    );
+}
+
 export function StartMeasurePanel({ style, updateStyle, startMeasureLabel, updateSection }: SettingPanelProps & { startMeasureLabel: string; updateSection: (p: Partial<Section>) => void }) {
     return (
         <div className="space-y-4">
@@ -84,6 +101,12 @@ export function StartMeasurePanel({ style, updateStyle, startMeasureLabel, updat
                 value={style.startMeasureColor}
                 onChange={(c) => updateStyle({ startMeasureColor: c })}
             />
+
+            <Separator />
+            <ResetPositionButton 
+                offset={style.startMeasureOffset} 
+                onReset={() => updateStyle({ startMeasureOffset: { x: 0, y: 0 } })} 
+            />
         </div>
     );
 }
@@ -145,6 +168,12 @@ export function MeasureRangePanel({ style, updateStyle, showMeasureCount, measur
                 label="Color"
                 value={style.measureRangeColor}
                 onChange={(c) => updateStyle({ measureRangeColor: c })}
+            />
+
+            <Separator />
+            <ResetPositionButton 
+                offset={style.measureRangeOffset} 
+                onReset={() => updateStyle({ measureRangeOffset: { x: 0, y: 0 } })} 
             />
         </div>
     );
@@ -287,6 +316,12 @@ export function GenericTextPanel({ type, style, updateStyle, value, onUpdateValu
                 label="Color"
                 value={(style as any)[c.color]}
                 onChange={(color) => updateStyle({ [c.color]: color })}
+            />
+
+            <Separator />
+            <ResetPositionButton 
+                offset={(style as any)[`${type}Offset`]} 
+                onReset={() => updateStyle({ [`${type}Offset` as any]: { x: 0, y: 0 } })} 
             />
         </div>
     );
