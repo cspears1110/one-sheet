@@ -10,7 +10,8 @@ export interface ColorPickerProps {
 }
 
 export function ColorPicker({ label, value, onChange }: ColorPickerProps) {
-    const colors = ['black', '#b71c1c', '#4a148c', '#1a237e', '#1b5e20', '#e65100'];
+    // Electric lighter palette: Black, Rose, Violet, Blue, Emerald, Amber
+    const colors = ['black', '#f43f5e', '#a855f7', '#0ea5e9', '#10b981', '#f59e0b'];
 
     return (
         <div className="space-y-2">
