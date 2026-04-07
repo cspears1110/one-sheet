@@ -44,19 +44,7 @@ const INITIAL_COMPOSITION: Composition = {
     arranger: '',
     subtitle: '',
     updatedAt: Date.now(),
-    sections: [
-        {
-            id: 'section-1',
-            title: '',
-            editorLabel: '',
-            startMeasure: 1,
-            endMeasure: undefined,
-            showMeasureCount: false,
-            timeSignature: '4/4',
-            subSections: [],
-            annotations: []
-        }
-    ],
+    sections: [],
     pageConfig: {
         size: 'letter',
         orientation: 'landscape'
@@ -66,7 +54,7 @@ const INITIAL_COMPOSITION: Composition = {
 export const useStore = create<AppState>()(
     persist(
         (set, get) => ({
-            rawText: '(1)\nTime: 4/4\n',
+            rawText: '',
             setRawText: (text) => set({ rawText: text }),
             composition: INITIAL_COMPOSITION,
             compositions: [],
@@ -78,12 +66,12 @@ export const useStore = create<AppState>()(
                 const updatedAt = Date.now();
                 const nextWithTime = { ...nextComp, updatedAt };
                 const serialized = serializeComposition(nextWithTime);
-                
+
                 // Also update the collection
-                const nextCompositions = state.compositions.map(c => 
+                const nextCompositions = state.compositions.map(c =>
                     c.id === nextWithTime.id ? nextWithTime : c
                 );
-                
+
                 // If it's not in the collection (e.g. migration or first save), add it
                 if (!nextCompositions.find(c => c.id === nextWithTime.id)) {
                     nextCompositions.push(nextWithTime);
@@ -98,7 +86,7 @@ export const useStore = create<AppState>()(
             loadComposition: (id) => {
                 const comp = get().compositions.find(c => c.id === id);
                 if (comp) {
-                    set({ 
+                    set({
                         composition: comp,
                         rawText: serializeComposition(comp)
                     });
@@ -108,11 +96,11 @@ export const useStore = create<AppState>()(
             },
             createNewComposition: (metadata) => {
                 const id = uuidv4();
-                const newComp = { 
-                    ...INITIAL_COMPOSITION, 
+                const newComp = {
+                    ...INITIAL_COMPOSITION,
                     ...metadata,
-                    id, 
-                    updatedAt: Date.now() 
+                    id,
+                    updatedAt: Date.now()
                 };
                 set(state => ({
                     compositions: [newComp, ...state.compositions],
@@ -146,9 +134,9 @@ export const useStore = create<AppState>()(
             setShowRawTextEditor: (show) => set({ showRawTextEditor: show }),
             generateSequence: (rows, mode, finalMeasure) => set((state) => {
                 const newSections: Section[] = rows.map((row, i) => {
-                    const nextRow = rows[i+1];
+                    const nextRow = rows[i + 1];
                     let endMeasure = nextRow && nextRow.start > row.start ? nextRow.start - 1 : undefined;
-                    
+
                     if (!nextRow && finalMeasure && finalMeasure >= row.start) {
                         endMeasure = finalMeasure;
                     }
@@ -169,20 +157,20 @@ export const useStore = create<AppState>()(
                         } : {}
                     };
                 });
-                
+
                 let nextSections: Section[];
                 if (mode === 'replace') {
                     nextSections = newSections;
                 } else {
                     nextSections = [...state.composition.sections, ...newSections];
                 }
-                
+
                 const nextComp = {
                     ...state.composition,
                     sections: nextSections,
                     updatedAt: Date.now()
                 };
-                
+
                 const serialized = serializeComposition(nextComp);
                 return {
                     composition: nextComp,

@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTheme } from 'next-themes';
 import { useStore } from '../lib/store';
+
 import { Button } from '@/components/ui/button';
 import {
   Plus,
@@ -13,8 +15,14 @@ import {
   Music2,
   Calendar,
   ChevronRight,
-  Layout
+  Layout,
+  Sun,
+  Moon
 } from 'lucide-react';
+
+import { Header } from '@/components/Header';
+import { MobileWarning } from '../components/MobileWarning';
+
 import { formatDistanceToNow } from 'date-fns';
 import { Input } from '@/components/ui/input';
 import {
@@ -54,6 +62,7 @@ export default function Home() {
   const router = useRouter();
   const { compositions, createNewComposition, deleteComposition } = useStore();
 
+
   useEffect(() => {
     setHydrated(true);
   }, []);
@@ -85,32 +94,25 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-[#fafafa] text-zinc-900 selection:bg-blue-100 selection:text-blue-900">
-      <main className="max-w-6xl mx-auto px-6 py-12 md:py-20 lg:py-24">
+    <div className="min-h-screen bg-background text-foreground transition-colors duration-300 selection:bg-blue-100 selection:text-blue-900">
+      <Header />
 
-        {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16">
+      <main className="max-w-6xl mx-auto px-6 py-12 md:py-16">
+        <div className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-8">
           <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-zinc-900 rounded-2xl shadow-lg shadow-zinc-900/10">
-                <Music2 className="h-6 w-6 text-white" />
-              </div>
-              <h1 className="text-3xl font-extrabold tracking-tight text-zinc-900 sm:text-4xl">OneSheet</h1>
-            </div>
-            <p className="text-zinc-500 text-lg max-w-sm leading-relaxed">
-              Musical annotation made simple. Create beautiful chord sheets and rehearsal maps in seconds.
+            <h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl">Welcome to OneSheet</h2>
+            <p className="text-muted-foreground text-lg max-w-sm">
+              Create beautifully formatted score diagrams.
             </p>
           </div>
 
           <Button
             onClick={() => setIsCreateModalOpen(true)}
-            className="group relative h-14 px-8 bg-zinc-950 hover:bg-zinc-900 text-white rounded-2xl shadow-2xl shadow-zinc-900/20 transition-all hover:-translate-y-1 overflow-hidden"
+            size="lg"
+            className="h-14 px-8 bg-zinc-950 dark:bg-zinc-100 dark:text-zinc-950 hover:bg-zinc-900 dark:hover:bg-zinc-200 text-white rounded-2xl shadow-xl transition-all hover:-translate-y-1"
           >
-            <div className="flex items-center gap-2 font-semibold text-lg relative z-10">
-              <Plus className="h-5 w-5 transition-transform group-hover:rotate-90" />
-              Create New OneSheet
-            </div>
-            <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            <Plus className="h-5 w-5 mr-2" />
+            Create New OneSheet
           </Button>
         </div>
 
@@ -210,12 +212,13 @@ export default function Home() {
         <div className="space-y-8">
 
           {/* Search Bar & Stats */}
-          <div className="flex flex-col sm:flex-row items-center gap-4 py-4 px-1 sticky top-6 z-40 bg-[#fafafa]/80 backdrop-blur-md">
+          <div className="flex flex-col sm:flex-row items-center gap-4 py-4 px-1 sticky top-6 z-40 bg-background/80 backdrop-blur-md">
+
             <div className="relative flex-1 w-full max-w-md">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
               <Input
                 placeholder="Search projects..."
-                className="pl-10 h-11 bg-white border-zinc-200 focus:border-zinc-400 focus:ring-0 rounded-xl shadow-sm transition-all"
+                className="pl-10 h-11 bg-background border-border focus:border-zinc-400 dark:focus:border-zinc-500 focus:ring-0 rounded-xl shadow-sm transition-all"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -238,12 +241,12 @@ export default function Home() {
               {filteredCompositions.map((comp) => (
                 <div
                   key={comp.id}
-                  className="group relative bg-white border border-zinc-200 rounded-3xl p-6 shadow-sm hover:shadow-xl hover:shadow-zinc-200/50 hover:border-zinc-300 transition-all cursor-pointer"
+                  className="group relative bg-card border border-border rounded-3xl p-6 shadow-sm hover:shadow-xl hover:shadow-zinc-200/20 dark:hover:shadow-zinc-950/50 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all cursor-pointer"
                   onClick={() => router.push(`/editor?id=${comp.id}`)}
                 >
                   <div className="flex justify-between items-start mb-6">
-                    <div className="p-3 bg-zinc-50 rounded-2xl group-hover:bg-zinc-100 transition-colors">
-                      <Layout className="h-6 w-6 text-zinc-400 group-hover:text-zinc-600 transition-colors" />
+                    <div className="p-3 bg-muted rounded-2xl group-hover:bg-accent transition-colors">
+                      <Layout className="h-6 w-6 text-muted-foreground group-hover:text-foreground transition-colors" />
                     </div>
                     <Button
                       variant="ghost"
@@ -261,18 +264,18 @@ export default function Home() {
 
                   <div className="space-y-4">
                     <div>
-                      <h3 className="text-lg font-bold text-zinc-900 group-hover:text-blue-600 transition-colors line-clamp-1">
+                      <h3 className="text-lg font-bold text-foreground group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors line-clamp-1">
                         {comp.title || 'Untitled Composition'}
                       </h3>
                       {comp.subtitle && (
-                        <p className="text-zinc-500 text-xs italic font-medium -mt-0.5 line-clamp-1">{comp.subtitle}</p>
+                        <p className="text-zinc-500 dark:text-zinc-400 text-xs italic font-medium -mt-0.5 line-clamp-1">{comp.subtitle}</p>
                       )}
                       {comp.composer && (
-                        <p className="text-zinc-400 text-sm font-medium mt-1 line-clamp-1">{comp.composer}</p>
+                        <p className="text-zinc-400 dark:text-zinc-500 text-sm font-medium mt-1 line-clamp-1">{comp.composer}</p>
                       )}
                     </div>
 
-                    <div className="flex items-center justify-between pt-4 border-t border-zinc-50">
+                    <div className="flex items-center justify-between pt-4 border-t border-border">
                       <div className="flex items-center gap-2 text-zinc-400">
                         <Calendar className="h-3.5 w-3.5" />
                         <span className="text-[11px] font-semibold uppercase tracking-wider">
@@ -289,18 +292,18 @@ export default function Home() {
               ))}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center py-24 px-6 border-2 border-dashed border-zinc-200 rounded-[2.5rem] bg-zinc-50/50">
-              <div className="p-6 bg-white rounded-3xl shadow-sm mb-6">
+            <div className="flex flex-col items-center justify-center py-24 px-6 border-2 border-dashed border-border rounded-[2.5rem] bg-muted/20">
+              <div className="p-6 bg-card rounded-3xl shadow-sm mb-6">
                 <FileText className="h-10 w-10 text-zinc-300" />
               </div>
-              <h3 className="text-xl font-bold text-zinc-900 mb-2">No projects found</h3>
-              <p className="text-zinc-500 text-center max-w-xs mb-8">
+              <h3 className="text-xl font-bold text-foreground mb-2">No projects found</h3>
+              <p className="text-muted-foreground text-center max-w-xs mb-8">
                 {search ? `We couldn't find any projects matching "${search}".` : "You haven't created any OneSheets yet. Start by creating your first rehearsal map."}
               </p>
               {!search && (
                 <Button
                   onClick={() => setIsCreateModalOpen(true)}
-                  className="bg-zinc-900 text-white rounded-2xl px-8 h-12 font-bold shadow-lg shadow-zinc-900/10"
+                  className="bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-950 text-white rounded-2xl px-8 h-12 font-bold shadow-lg shadow-zinc-900/10 dark:hover:bg-zinc-200"
                 >
                   Create Your First Project
                 </Button>
@@ -311,18 +314,18 @@ export default function Home() {
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
-          <AlertDialogContent className="border-none shadow-2xl rounded-3xl p-8 bg-white max-w-md">
+          <AlertDialogContent className="border-none shadow-2xl rounded-3xl p-8 bg-card max-w-md">
             <AlertDialogHeader className="mb-4">
               <div className="h-14 w-14 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center mb-6">
                 <Trash2 className="h-7 w-7" />
               </div>
-              <AlertDialogTitle className="text-2xl font-bold text-zinc-900 mb-2">Delete {compositionToDelete?.title}?</AlertDialogTitle>
-              <AlertDialogDescription className="text-zinc-500 leading-relaxed">
-                Are you sure you want to delete <span className="font-bold text-zinc-900">"{compositionToDelete?.title}"</span>? This action cannot be undone and you will lose all data for this project.
+              <AlertDialogTitle className="text-2xl font-bold text-foreground mb-2 transition-colors duration-300">Delete {compositionToDelete?.title}?</AlertDialogTitle>
+              <AlertDialogDescription className="text-muted-foreground text-lg leading-relaxed">
+                Are you sure you want to delete <span className="font-bold text-foreground">"{compositionToDelete?.title}"</span>? This action cannot be undone and you will lose all data for this project.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="gap-3 sm:gap-3">
-              <AlertDialogCancel className="h-12 border-zinc-200 text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 rounded-xl font-bold px-6">
+              <AlertDialogCancel className="h-12 border-border text-muted-foreground hover:bg-muted hover:text-foreground rounded-xl font-bold px-6 transition-all duration-200">
                 Cancel
               </AlertDialogCancel>
               <AlertDialogAction
@@ -338,9 +341,11 @@ export default function Home() {
         </AlertDialog>
 
         <footer className="mt-24 pb-12 border-t border-zinc-100 pt-8 text-center text-zinc-400 text-sm font-medium tracking-wide">
-          2026 — Created by <span className="text-zinc-600">Coleman Spears</span>. <span className="opacity-50 ml-2">v{process.env.NEXT_PUBLIC_APP_VERSION}</span>
+          © 2026 — Created by <span className="text-zinc-600">Coleman Spears</span>. <span className="opacity-50 ml-2">v{process.env.NEXT_PUBLIC_APP_VERSION}</span>
         </footer>
       </main>
+      <MobileWarning />
     </div>
+
   );
 }

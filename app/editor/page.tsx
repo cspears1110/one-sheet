@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Printer, Home as HomeIcon } from 'lucide-react';
 import Link from 'next/link';
 
+
 function EditorContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -31,10 +32,10 @@ function EditorContent() {
 
   return (
     <div id="app-root" className="flex h-screen w-screen overflow-hidden bg-background text-foreground print:block print:h-full print:w-full print:overflow-visible relative">
-      <div className="w-1/3 min-w-[300px] flex flex-col print:hidden border-r bg-zinc-50/50">
+      <div className="w-1/3 min-w-[300px] flex flex-col print:hidden border-r bg-zinc-50/50 dark:bg-zinc-950/50">
         <TextEditor />
       </div>
-      <div className="flex-1 overflow-auto flex items-center justify-center relative print:block print:overflow-visible bg-zinc-100/30">
+      <div className="flex-1 overflow-auto flex items-center justify-center relative print:block print:overflow-visible bg-zinc-100/30 dark:bg-zinc-900/30">
         <CanvasRenderer />
         <div className="absolute bottom-8 right-8 print:hidden">
           <Button
@@ -47,6 +48,7 @@ function EditorContent() {
         </div>
       </div>
     </div>
+
   );
 }
 
