@@ -9,7 +9,8 @@ import { Input } from '@/components/ui/input';
 import { useTheme } from 'next-themes';
 
 export function SettingsEditor() {
-    const { composition, updateCompositionAndSync, pageConfig, setPageConfig, showRawTextEditor, setShowRawTextEditor } = useStore();
+    const { composition, updateCompositionAndSync, setPageConfig, showRawTextEditor, setShowRawTextEditor } = useStore();
+    const pageConfig = composition.pageConfig || { size: 'letter', orientation: 'landscape' };
     const { theme, setTheme } = useTheme();
 
     const updateGlobalStyle = (patch: any) => {

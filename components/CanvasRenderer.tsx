@@ -13,12 +13,13 @@ import { processImageFile } from '../lib/image-utils';
 export function CanvasRenderer() {
     const { 
         composition, 
-        pageConfig, 
         activeSelection, 
         setActiveSelection, 
         updateCompositionAndSync,
         addToGallery 
     } = useStore();
+
+    const pageConfig = composition.pageConfig || { size: 'letter', orientation: 'landscape' };
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {

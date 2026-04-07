@@ -130,6 +130,8 @@ export interface Composition {
   sections: Section[];
   style?: GlobalStyle;
   imageGallery?: { id: string; src: string; aspectRatio: number }[];
+  pageConfig?: PageConfig;
+  updatedAt?: number;
 }
 
 export type PageSize = 'letter' | 'legal' | 'tabloid';

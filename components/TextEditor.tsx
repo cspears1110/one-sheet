@@ -11,6 +11,8 @@ import { FormEditor } from './FormEditor';
 import { SettingsEditor } from './SettingsEditor';
 import { Inspector } from './Inspector';
 import { AnnotationsEditor } from './AnnotationsEditor';
+import { LayoutDashboard } from 'lucide-react';
+import Link from 'next/link';
 import CodeMirror from '@uiw/react-codemirror';
 
 export function TextEditor() {
@@ -66,7 +68,15 @@ export function TextEditor() {
 
                 {/* Fixed Header & Tabs */}
                 <div className="p-4 border-b border-border bg-background">
-                    <h2 className="text-xl font-semibold mb-4 text-foreground">OneSheet</h2>
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-xl font-bold tracking-tight text-foreground">OneSheet</h2>
+                        <Link href="/">
+                            <button className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-md hover:bg-muted">
+                                <LayoutDashboard className="h-3.5 w-3.5" />
+                                Dashboard
+                            </button>
+                        </Link>
+                    </div>
                     <TabsList className={`grid w-full ${showRawTextEditor ? 'grid-cols-5' : 'grid-cols-4'} bg-muted p-1 rounded-lg h-10`}>
 
                         <TabsTrigger
@@ -126,7 +136,7 @@ export function TextEditor() {
                             value={localText}
                             height="100%"
                             indentWithTab={true}
-                            onChange={(value) => setLocalText(value)}
+                            onChange={(value: string) => setLocalText(value)}
                             theme={cmTheme}
                             extensions={[oneSheetSyntax, oneSheetFolding]}
                             placeholder={`Title: My Piece\nSubtitle: Movement 1\nComposer: Me\nCreated By: John Doe\n\nIntro (1-8)\nTime: 4/4\n\tTheme A (1-4)\n\t\tPhrase 1 (1-2)\n\t\tPhrase 2 (3-4)`}
