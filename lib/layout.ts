@@ -116,6 +116,11 @@ export function wrapText(text: string, maxPixelWidth: number, font: string = '12
 
     return { lines: displayLines, actualMaxWidth: absoluteMaxWidth };
 }
+// Helper to accurately calculate the number of measures a section occupies natively
+export function calculateMeasureCount(section: Section, inferredEnd?: number): number {
+    const endM = section.endMeasure ?? inferredEnd ?? section.startMeasure;
+    return Math.max(1, endM - section.startMeasure + 1);
+}
 
 // Helper to determine the minimum dimensions required for a section subtree
 function calculateMinDimensions(section: Section, config: LayoutConfig, inferredEnd?: number): { width: number; depth: number } {
@@ -168,8 +173,12 @@ function calculateMinDimensions(section: Section, config: LayoutConfig, inferred
 
     // 5. Add additional width for annotations and tempo
     const annotationsWidth = section.annotations.length > 0 ? 50 : 0;
-    const tempoFont = style.tempoModifiers?.includes('bold') ? 'bold 12px sans-serif' : '12px sans-serif';
-    const tempoWidth = section.tempo ? measureTextWidth(section.tempo, tempoFont) + 20 : 0;
+    const tempoFont = style.tempoModifiers?.includes('bold') ? 'bold 14px sans-serif' : '14px sans-serif';
+    
+    // The SVGs for tempo notes are quite wide. If we just measure the string "[q]", we under-report.
+    const tempoWidth = section.tempo 
+        ? measureTextWidth(section.tempo.replace(/\[\w+\.?\]/g, '        '), tempoFont) + 20 
+        : 0;
 
     let selfMinWidth = Math.max(titleRequirement + annotationsWidth, tempoWidth, minMeasureTextWidth, 60);
 
@@ -246,9 +255,29 @@ function layoutSectionCoordinates(
     };
 
     if (section.subSections.length > 0) {
-        // Distribute assigned width among children proportionally to their min widths
-        const childrenDims = section.subSections.map(sub => calculateMinDimensions(sub, config).width);
-        const sumMins = childrenDims.reduce((acc, val) => acc + val, 0);
+        // Calculate min dims and measures for all children
+        const childrenMetrics = section.subSections.map((sub, i) => {
+            let childInferredEnd: number | undefined;
+            if (sub.endMeasure === undefined) {
+                if (i < section.subSections.length - 1) {
+                    childInferredEnd = Math.max(sub.startMeasure, section.subSections[i + 1].startMeasure - 1);
+                } else {
+                    const fallbackEnd = inferredEndMeasure ?? section.endMeasure ?? section.startMeasure;
+                    childInferredEnd = fallbackEnd; // Inherit parent's end boundary
+                }
+            }
+            
+            return {
+                child: sub,
+                inferredEnd: childInferredEnd,
+                minWidth: calculateMinDimensions(sub, config, childInferredEnd).width,
+                measures: calculateMeasureCount(sub, childInferredEnd)
+            };
+        });
+
+        const sumMins = childrenMetrics.reduce((acc, m) => acc + m.minWidth, 0);
+        const totalMeasures = childrenMetrics.reduce((acc, m) => acc + m.measures, 0);
+        const remainingSpace = Math.max(0, assignedWidth - sumMins);
 
         // Check if any child section has a tempo marking to inject vertical margin
         const anyChildHasTempo = section.subSections.some(sub => sub.tempo);
@@ -257,24 +286,19 @@ function layoutSectionCoordinates(
         positioned.height = yOffsetForChildren; // Ensure the vertical black line extends exactly to the children
 
         let maxChildSubtreeHeight = 0;
-
         let currentX = 0;
-        section.subSections.forEach((child, i) => {
-            let childInferredEnd: number | undefined;
-            if (child.endMeasure === undefined) {
-                if (i < section.subSections.length - 1) {
-                    childInferredEnd = Math.max(child.startMeasure, section.subSections[i + 1].startMeasure - 1);
-                } else {
-                    const fallbackEnd = positioned.inferredEndMeasure ?? positioned.section.endMeasure ?? positioned.section.startMeasure;
-                    childInferredEnd = fallbackEnd; // Inherit parent's end boundary
-                }
-            }
 
-            const childMinW = childrenDims[i];
-            // Scale child width if parent was forcefully expanded, else use min width
-            const childWidth = sumMins > 0 ? (childMinW / sumMins) * assignedWidth : assignedWidth / section.subSections.length;
+        childrenMetrics.forEach((m) => {
+            // Distribute remaining space based on measure count. If totalMeasures is 0, split evenly.
+            const measureFraction = totalMeasures > 0 ? (m.measures / totalMeasures) : (1 / childrenMetrics.length);
+            
+            // If parent was severely crushed below sumMins (shouldn't happen natively due to min logic, but just in case)
+            // we scale the minWidths down. Otherwise, we add proportional free space.
+            const childWidth = sumMins > assignedWidth 
+                ? (sumMins > 0 ? (m.minWidth / sumMins) * assignedWidth : assignedWidth / childrenMetrics.length)
+                : m.minWidth + (remainingSpace * measureFraction);
 
-            const renderedChild = layoutSectionCoordinates(child, currentX, yOffsetForChildren, childWidth, config, childInferredEnd);
+            const renderedChild = layoutSectionCoordinates(m.child, currentX, yOffsetForChildren, childWidth, config, m.inferredEnd);
             positioned.children.push(renderedChild);
 
             if (renderedChild.subtreeHeight > maxChildSubtreeHeight) {
@@ -306,13 +330,38 @@ function extendSubtreeHeight(posn: PositionedSection, targetHeight: number) {
 export function computeLayout(composition: Composition, config: LayoutConfig): Staff[] {
     const staves: Staff[] = [];
 
-    let currentStaffSections: PositionedSection[] = [];
-    let currentStaffX = 0;
+    interface StaffTopSection {
+        section: Section;
+        inferredEnd?: number;
+        minWidth: number;
+        measures: number;
+    }
+
+    let pendingSections: StaffTopSection[] = [];
+    let currentStaffMinX = 0;
     // Staves start at logical Y=0. Header padding is handled by the SVG positioning.
     let currentStaffY = 0;
 
     const commitStaff = () => {
-        if (currentStaffSections.length === 0) return;
+        if (pendingSections.length === 0) return;
+
+        const totalMinWidth = pendingSections.reduce((acc, s) => acc + s.minWidth, 0);
+        const remainingSpace = Math.max(0, config.maxWidth - totalMinWidth);
+        const totalMeasures = pendingSections.reduce((acc, s) => acc + s.measures, 0);
+
+        let currentStaffSections: PositionedSection[] = [];
+        let renderX = 0;
+
+        pendingSections.forEach(s => {
+            const measureFraction = totalMeasures > 0 ? (s.measures / totalMeasures) : (1 / pendingSections.length);
+            const assignedWidth = totalMinWidth > config.maxWidth 
+                ? (totalMinWidth > 0 ? (s.minWidth / totalMinWidth) * config.maxWidth : config.maxWidth / pendingSections.length)
+                : s.minWidth + (remainingSpace * measureFraction);
+
+            const renderedSection = layoutSectionCoordinates(s.section, renderX, 0, assignedWidth, config, s.inferredEnd);
+            currentStaffSections.push(renderedSection);
+            renderX += assignedWidth;
+        });
 
         // If any top-level section in this staff has a tempo marking, we need extra top margin
         // so it doesn't collide with the header or the staff above it.
@@ -333,8 +382,9 @@ export function computeLayout(composition: Composition, config: LayoutConfig): S
             sections: currentStaffSections,
         });
         currentStaffY += staffHeight + Theme.layout.staffMarginBottom; // staff margin
-        currentStaffSections = [];
-        currentStaffX = 0;
+        
+        pendingSections = [];
+        currentStaffMinX = 0;
     };
 
     for (let i = 0; i < composition.sections.length; i++) {
@@ -351,17 +401,16 @@ export function computeLayout(composition: Composition, config: LayoutConfig): S
         }
 
         const { width: minWidth, depth } = calculateMinDimensions(topSection, config, inferredEnd);
+        const measures = calculateMeasureCount(topSection, inferredEnd);
 
         // Check if we need to wrap
         // If a single section is larger than maxWidth, it gets its own staff anyway
-        if (currentStaffX + minWidth > config.maxWidth && currentStaffSections.length > 0) {
+        if (currentStaffMinX + minWidth > config.maxWidth && pendingSections.length > 0) {
             commitStaff();
         }
 
-        // Now currentStaffX is 0 if we just wrapped
-        const renderedSection = layoutSectionCoordinates(topSection, currentStaffX, 0, minWidth, config, inferredEnd);
-        currentStaffSections.push(renderedSection);
-        currentStaffX += minWidth;
+        pendingSections.push({ section: topSection, inferredEnd, minWidth, measures });
+        currentStaffMinX += minWidth;
     }
 
     commitStaff(); // Final commit

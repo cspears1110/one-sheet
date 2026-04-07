@@ -186,6 +186,14 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
 
     // Helper to parse text tokens and render SMuFL symbols
     const formatTempoText = (text: string) => {
+        const currentStyle = section.style || {};
+        const modifiers = currentStyle.tempoModifiers || ['bold'];
+        
+        let fontStr = '14px sans-serif';
+        if (modifiers.includes('bold') && modifiers.includes('italic')) fontStr = 'bold italic ' + fontStr;
+        else if (modifiers.includes('bold')) fontStr = 'bold ' + fontStr;
+        else if (modifiers.includes('italic')) fontStr = 'italic ' + fontStr;
+
         // Regex matches standalone q, w, h, e, s (optionally dotted)
         const parts = text.split(/(\b[whqes]\.?(?!\w))/);
 
@@ -208,19 +216,8 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                     if (!part) return null;
                     const elX = currentOffsetX;
 
-                    // Approximate widths for a 14px bold sans-serif font
-                    const getCharWidth = (char: string) => {
-                        if (char === ' ') return 2;
-                        if (/[WMOQG@\%]/.test(char)) return 11;
-                        if (/[A-Z]/.test(char)) return 9.5;
-                        if (/[ilj.,()\-\'\:\;]/.test(char)) return 4.5;
-                        if (/[0-9]/.test(char)) return 8;
-                        if (/[m]/.test(char)) return 12;
-                        if (/[w]/.test(char)) return 10;
-                        return 8; // Default lowercase/fallback
-                    };
-
-                    const width = part.split('').reduce((sum, char) => sum + getCharWidth(char), 0);
+                    // Measure using the exact CSS string applied to the node so kerning is identical
+                    const width = measureTextWidth(part, fontStr);
                     currentOffsetX += width;
 
                     return (
@@ -240,9 +237,9 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
 
                 const totalWidth = noteWidth + dotWidth;
 
-                // Subtract a bit from elX to pull it tighter, then update currentOffsetX
-                const elX = currentOffsetX - 8; 
-                currentOffsetX += (totalWidth - 8) + 2; 
+                // The string before this may or may not have a trailing space. Add a 2px buffer left and 2px buffer right.
+                const elX = currentOffsetX + 2; 
+                currentOffsetX += totalWidth + 4; 
 
                 return (
                     <g key={index} transform={`translate(${elX}, 0) scale(${scale})`}>
