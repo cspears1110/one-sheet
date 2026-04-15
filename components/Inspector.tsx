@@ -157,9 +157,10 @@ export function Inspector() {
             case 'title':
             case 'text':
             case 'tempo':
+            case 'keyCenter':
                 return (
                     <GenericTextPanel
-                        type={activeSelection.type}
+                        type={activeSelection.type as any}
                         style={currentStyle}
                         updateStyle={updateStyle}
                         value={(actualNode as any)[activeSelection.type] || ''}

@@ -1,6 +1,6 @@
 export interface Annotation {
   id: string;
-  type: 'dynamic' | 'text' | 'tempo' | 'marker' | 'clef' | 'articulation' | 'bowing' | 'line' | 'image';
+  type: 'dynamic' | 'text' | 'tempo' | 'marker' | 'clef' | 'articulation' | 'bowing' | 'line' | 'image' | 'ending_open' | 'ending_closed';
   value: string;
   offset: { x: number; y: number };
   src?: string; // Base64 data for images
@@ -66,6 +66,13 @@ export interface SectionStyle {
   endBarlineShape?: 'single' | 'double' | 'dashed' | 'end' | 'repeat-start' | 'repeat-end' | 'double-repeat';
   endBarlineColor?: string;
   hideEndBarline?: boolean;
+
+  // Key Center
+  keyCenterModifiers?: ('bold' | 'italic' | 'underline')[];
+  keyCenterColor?: string;
+  keyCenterFontSize?: number;
+  hideKeyCenter?: boolean;
+  keyCenterOffset?: { x: number; y: number };
 }
 
 export interface Section {
@@ -81,6 +88,7 @@ export interface Section {
   tempo?: string;
   timeSignature?: string;
   text?: string;
+  keyCenter?: string;
   showMeasureCount?: boolean;
   style?: SectionStyle;
 }

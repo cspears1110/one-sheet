@@ -26,6 +26,15 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+    DialogDescription,
+} from "@/components/ui/dialog";
+import { Label } from '@/components/ui/label';
 
 import { FlattenedItem, flattenTree, buildTreeFromFlatWithDepth } from '../lib/tree-utils';
 import { SectionCard } from './SectionCard';
@@ -44,6 +53,12 @@ export function FormEditor() {
         isOpen: false,
         id: null,
         count: 0
+    });
+
+    const [addSubsectionDialog, setAddSubsectionDialog] = useState<{ isOpen: boolean; parentId: string | null; count: number }>({
+        isOpen: false,
+        parentId: null,
+        count: 2
     });
 
     // Flatten AST so we have a 1D mapping to render and sort
@@ -133,51 +148,77 @@ export function FormEditor() {
     };
 
     const handleAddSubsection = (id: string) => {
-        const index = flattenedItems.findIndex(i => i.id === id);
+        setAddSubsectionDialog({
+            isOpen: true,
+            parentId: id,
+            count: 2
+        });
+    };
+
+    const executeBatchAddSubsections = (parentId: string, count: number) => {
+        const index = flattenedItems.findIndex(i => i.id === parentId);
         if (index === -1) return;
 
         const parentItem = flattenedItems[index];
-
+        const newItems = [...flattenedItems];
+        
         let siblingCount = 0;
-        let lastSibling: FlattenedItem | null = null;
         for (let i = index + 1; i < flattenedItems.length; i++) {
             if (flattenedItems[i].depth <= parentItem.depth) break;
             if (flattenedItems[i].depth === parentItem.depth + 1) {
                 siblingCount++;
-                lastSibling = flattenedItems[i];
             }
         }
 
-        let defaultStartMeasure = parentItem.startMeasure;
-        if (lastSibling) {
-            defaultStartMeasure = lastSibling.endMeasure !== undefined ? lastSibling.endMeasure + 1 : lastSibling.startMeasure + 1;
-        }
-
-        const newId = uuidv4();
-        const newSection: FlattenedItem = {
-            id: newId,
-            title: '',
-            editorLabel: `Subsection ${siblingCount + 1}`,
-            startMeasure: defaultStartMeasure,
-            endMeasure: undefined,
-            subSections: [],
-            annotations: [],
-            depth: parentItem.depth + 1
-        };
-
-        // Find the index of the last descendant to append the new section at the end of the parent.
+        // Find initial insert index (end of parent)
         let insertIndex = index;
         for (let i = index + 1; i < flattenedItems.length; i++) {
             if (flattenedItems[i].depth <= parentItem.depth) break;
             insertIndex = i;
         }
 
-        const newItems = [...flattenedItems];
-        newItems.splice(insertIndex + 1, 0, newSection);
+        let firstNewId: string | null = null;
+        let runningMeasure = parentItem.startMeasure;
+
+        // If there are already siblings, figure out where to start measuring
+        let lastKnownSibling: FlattenedItem | null = null;
+        for (let i = index + 1; i < flattenedItems.length; i++) {
+            if (flattenedItems[i].depth <= parentItem.depth) break;
+            if (flattenedItems[i].depth === parentItem.depth + 1) {
+                lastKnownSibling = flattenedItems[i];
+            }
+        }
+        if (lastKnownSibling) {
+            runningMeasure = lastKnownSibling.endMeasure !== undefined ? lastKnownSibling.endMeasure + 1 : lastKnownSibling.startMeasure + 1;
+        }
+
+        for (let c = 0; c < count; c++) {
+            const newId = uuidv4();
+            if (c === 0) firstNewId = newId;
+
+            const newSection: FlattenedItem = {
+                id: newId,
+                title: '',
+                editorLabel: `Subsection ${siblingCount + c + 1}`,
+                startMeasure: runningMeasure,
+                endMeasure: undefined,
+                subSections: [],
+                annotations: [],
+                depth: parentItem.depth + 1
+            };
+
+            newItems.splice(insertIndex + 1 + c, 0, newSection);
+            runningMeasure += 1; // Basic heuristic increment
+        }
+
         updateCompositionAndSync(prev => ({ ...prev, sections: buildTreeFromFlatWithDepth(newItems) }));
 
-        setNewSectionId(newId);
-        setTimeout(() => handleSetActiveSectionId(newId), 50);
+        if (firstNewId) {
+            setNewSectionId(firstNewId);
+            setTimeout(() => handleSetActiveSectionId(firstNewId), 50);
+        }
+        
+        setAddSubsectionDialog({ isOpen: false, parentId: null, count: 2 });
     };
 
     const handleAddSiblingAbove = (id: string) => {
@@ -602,6 +643,45 @@ export function FormEditor() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            <Dialog open={addSubsectionDialog.isOpen} onOpenChange={(open) => setAddSubsectionDialog(prev => ({ ...prev, isOpen: open }))}>
+                <DialogContent className="sm:max-w-[320px]">
+                    <DialogHeader>
+                        <DialogTitle>Add Sub-sections</DialogTitle>
+                        <DialogDescription>
+                            How many sub-sections would you like to create?
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <div className="flex flex-col gap-2">
+                            <Label htmlFor="subsection-count" className="text-xs font-semibold">Number of Sub-sections</Label>
+                            <Input
+                                id="subsection-count"
+                                type="number"
+                                min="1"
+                                max="20"
+                                value={addSubsectionDialog.count}
+                                onChange={(e) => setAddSubsectionDialog(prev => ({ ...prev, count: parseInt(e.target.value) || 1 }))}
+                                className="h-9"
+                                autoFocus
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button
+                            variant="default"
+                            className="w-full"
+                            onClick={() => {
+                                if (addSubsectionDialog.parentId) {
+                                    executeBatchAddSubsections(addSubsectionDialog.parentId, addSubsectionDialog.count);
+                                }
+                            }}
+                        >
+                            Create Sub-sections
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

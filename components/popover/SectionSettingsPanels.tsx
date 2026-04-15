@@ -229,7 +229,7 @@ export function BracePanel({ style, effectiveBraceShape, updateStyle }: SettingP
     );
 }
 
-type GenericTextType = 'title' | 'text' | 'tempo';
+type GenericTextType = 'title' | 'text' | 'tempo' | 'keyCenter';
 
 export function GenericTextPanel({ type, style, updateStyle, value, onUpdateValue }: SettingPanelProps & { type: GenericTextType; value: string; onUpdateValue: (val: string) => void }) {
     const config = {
@@ -247,6 +247,11 @@ export function GenericTextPanel({ type, style, updateStyle, value, onUpdateValu
             modifiers: 'tempoModifiers', fontSize: 'tempoFontSize', defaultFontSize: 14, defaultModifiers: ['bold'],
             color: 'tempoColor', hide: 'hideTempo', hideLabel: 'Hide Tempo',
             placeholder: 'ex. Allegro q=120'
+        },
+        keyCenter: {
+            modifiers: 'keyCenterModifiers', fontSize: 'keyCenterFontSize', defaultFontSize: 14, defaultModifiers: [],
+            color: 'keyCenterColor', hide: 'hideKeyCenter', hideLabel: 'Hide Key Center',
+            placeholder: 'ex. C Major'
         }
     } as const;
 
@@ -276,7 +281,7 @@ export function GenericTextPanel({ type, style, updateStyle, value, onUpdateValu
             <div className="space-y-2">
                 <div className="flex items-center gap-1.5">
                     <Label className="text-xs font-semibold">
-                        {type === 'title' ? 'Title' : type === 'text' ? 'Text Content' : 'Tempo'}
+                        {type === 'title' ? 'Title' : type === 'text' ? 'Text Content' : type === 'keyCenter' ? 'Key Center' : 'Tempo'}
                     </Label>
                     {type === 'tempo' && (
                         <TooltipProvider delayDuration={300}>

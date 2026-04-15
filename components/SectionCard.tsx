@@ -55,6 +55,7 @@ export function SectionCard({ item, depth, index, isCollapsed, hasChildren, isAc
     const [showTempo, setShowTempo] = useState(!!item.tempo);
     const [showTime, setShowTime] = useState(!!item.timeSignature);
     const [showText, setShowText] = useState(!!item.text);
+    const [showKeyCenter, setShowKeyCenter] = useState(!!item.keyCenter);
     const [showExplicitEnd, setShowExplicitEnd] = useState(item.endMeasure !== undefined);
 
     const startMeasureRef = useRef<HTMLInputElement>(null);
@@ -190,6 +191,12 @@ export function SectionCard({ item, depth, index, isCollapsed, hasChildren, isAc
                                     >
                                         Text Block
                                     </DropdownMenuCheckboxItem>
+                                    <DropdownMenuCheckboxItem
+                                        checked={showKeyCenter}
+                                        onCheckedChange={(c) => { setShowKeyCenter(c); if (!c && item.keyCenter) onChange('keyCenter', undefined); }}
+                                    >
+                                        Key Center
+                                    </DropdownMenuCheckboxItem>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem onClick={onPromote} disabled={depth <= 0}>
                                         <ChevronLeft className="w-4 h-4 mr-2" /> Promote
@@ -310,6 +317,18 @@ export function SectionCard({ item, depth, index, isCollapsed, hasChildren, isAc
                                         />
                                     </div>
                                 )}
+                            </div>
+                        )}
+
+                        {showKeyCenter && (
+                            <div className="mt-2">
+                                <label className="text-[10px] uppercase font-bold text-muted-foreground mb-0.5 block">Key Center</label>
+                                <Input
+                                    className="h-7 text-xs shadow-none border-dashed bg-muted/50 hover:bg-background focus:bg-background"
+                                    placeholder="e.g. C Major / A Minor"
+                                    value={item.keyCenter || ''}
+                                    onChange={e => onChange('keyCenter', e.target.value)}
+                                />
                             </div>
                         )}
 

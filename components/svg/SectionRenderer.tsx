@@ -4,7 +4,7 @@ import { Section, SectionStyle } from '../../lib/types';
 import { useStore, ActiveSelectionType } from '../../lib/store';
 import { BravuraPaths } from '../../lib/bravura-paths';
 import { measureTextWidth } from '../../lib/measure-text';
-import { SmuflSymbol } from './SmuflComponents';
+import { SmuflSymbol, getSmuflBounds } from './SmuflComponents';
 
 interface Props {
     positioned: PositionedSection;
@@ -25,7 +25,7 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
     const [draggingAnnotation, setDraggingAnnotation] = useState<string | null>(null);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
-    const [resizingAnnotation, setResizingAnnotation] = useState<{ id: string, type: string, startWidth: number } | null>(null);
+    const [resizingAnnotation, setResizingAnnotation] = useState<{ id: string, type: string, startWidth: number, mode?: 'scale' | 'width' | 'both' } | null>(null);
     const [resizeStartScale, setResizeStartScale] = useState(1);
     const [resizeDragOffset, setResizeDragOffset] = useState({ dx: 0, dy: 0 });
 
@@ -102,10 +102,10 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
         }
     };
 
-    const handleResizePointerDown = (e: React.PointerEvent<SVGRectElement>, annId: string, currentScale: number, type: string, startWidth: number = 50) => {
+    const handleResizePointerDown = (e: React.PointerEvent<SVGRectElement>, annId: string, currentScale: number, type: string, startWidth: number = 50, mode: 'scale' | 'width' | 'both' = 'both') => {
         e.stopPropagation();
         e.currentTarget.setPointerCapture(e.pointerId);
-        setResizingAnnotation({ id: annId, type, startWidth });
+        setResizingAnnotation({ id: annId, type, startWidth, mode });
         setResizeStartScale(currentScale);
         setResizeDragOffset({ dx: 0, dy: 0 });
         setActiveSelection({ sectionId: section.id, type: 'annotation', annotationId: annId });
@@ -137,14 +137,14 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
     const handleResizePointerUp = (e: React.PointerEvent<SVGRectElement>, annId: string) => {
         if (resizingAnnotation?.id === annId) {
             e.stopPropagation();
-            const { type, startWidth } = resizingAnnotation;
+            const { type, startWidth, mode } = resizingAnnotation;
             setResizingAnnotation(null);
             e.currentTarget.releasePointerCapture(e.pointerId);
 
             let newProps: any = {};
-            if (type === 'line') {
-                const finalWidth = Math.max(10, startWidth + resizeDragOffset.dx);
-                const deltaScale = resizeDragOffset.dy * 0.015;
+            if (type === 'line' || type === 'ending_closed' || type === 'ending_open') {
+                const finalWidth = mode === 'scale' ? startWidth : Math.max(10, startWidth + resizeDragOffset.dx);
+                const deltaScale = mode === 'width' ? 0 : resizeDragOffset.dy * 0.015;
                 const finalScale = Math.max(0.5, Math.min(5, resizeStartScale + deltaScale));
                 newProps = { width: Math.round(finalWidth), scale: Number(finalScale.toFixed(2)) };
             } else {
@@ -608,7 +608,7 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
             )}
 
             {/* Start Measure Number Interactive Group */}
-            {!isFirstChild && !hideStartMeasure && (() => {
+            {!isFirstChild && (() => {
                 const smText = currentStyle.startMeasureLabel || section.startMeasureLabel || positioned.startMeasure.toString();
                 const fontSize = currentStyle.startMeasureFontSize || globalStyle.startMeasureFontSize || 11;
                 const smFont = (currentStyle.startMeasureTextModifiers || ['bold']).includes('bold') ? `bold ${fontSize}px sans-serif` : `${fontSize}px sans-serif`;
@@ -630,7 +630,7 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
 
                 return (
                     <g
-                        className={`cursor-pointer group select-none ${isSelected('startMeasure') ? 'text-blue-600' : ''}`}
+                        className={`cursor-pointer group select-none ${hideStartMeasure ? 'print:hidden' : ''} ${isSelected('startMeasure') ? 'text-blue-600' : ''}`}
                         onPointerDown={(e) => handleStructuralPointerDown(e, 'startMeasure')}
                         onPointerMove={handleStructuralPointerMove}
                         onPointerUp={(e) => handleStructuralPointerUp(e, 'startMeasure')}
@@ -823,11 +823,11 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                 const currentOffsetX = isDraggingThis ? ann.offset.x + dragOffset.x : ann.offset.x;
                 const currentOffsetY = isDraggingThis ? ann.offset.y + dragOffset.y : ann.offset.y;
 
-                const smuflTypes: Record<string, { prefix: string, boxY: number, boxHeight: number }> = {
-                    'dynamic': { prefix: 'DYN_', boxY: -450, boxHeight: 700 },
-                    'clef': { prefix: 'CLEF_', boxY: -700, boxHeight: 1000 },
-                    'articulation': { prefix: 'ARTIC_', boxY: -250, boxHeight: 400 },
-                    'bowing': { prefix: 'BOW_', boxY: -250, boxHeight: 400 },
+                const smuflTypes: Record<string, { prefix: string }> = {
+                    'dynamic': { prefix: 'DYN_' },
+                    'clef': { prefix: 'CLEF_' },
+                    'articulation': { prefix: 'ARTIC_' },
+                    'bowing': { prefix: 'BOW_' },
                 };
 
                 if (ann.type in smuflTypes) {
@@ -844,16 +844,19 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                     const fill = isSelectedAnn ? '#3b82f6' : (ann.color || 'black');
                     
                     const pathData = BravuraPaths[symbolKey as keyof typeof BravuraPaths];
-                    const intrinsicWidth = pathData ? (pathData as any).width : 1000;
+                    if (!pathData) return null;
+
+                    const bounds = getSmuflBounds(symbolKey as keyof typeof BravuraPaths);
                     
-                    const boxWidth = intrinsicWidth * visualScale;
-                    const boxHeight = params.boxHeight * visualScale;
-                    const boxY = params.boxY * visualScale;
+                    const boxWidth = bounds.width * visualScale;
+                    const boxHeight = bounds.height * visualScale;
+                    const boxX = bounds.minX * visualScale;
+                    const boxY = bounds.minY * visualScale;
                     
                     const pad = 4;
                     const drawWidth = boxWidth + (pad * 2);
                     const drawHeight = boxHeight + (pad * 2);
-                    const drawX = -pad;
+                    const drawX = boxX - pad;
                     const drawY = boxY - pad;
                     
                     return (
@@ -893,6 +896,92 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                         </g>
                     );
                 }
+                if (ann.type === 'ending_closed' || ann.type === 'ending_open') {
+                    let currentWidth = ann.width !== undefined ? ann.width : 50;
+                    let currentScaleVal = ann.scale !== undefined ? ann.scale : 1;
+
+                    if (resizingAnnotation?.id === ann.id) {
+                        if (resizingAnnotation.mode !== 'scale') {
+                            currentWidth = Math.max(20, currentWidth + resizeDragOffset.dx);
+                        }
+                        if (resizingAnnotation.mode !== 'width') {
+                            const deltaScale = resizeDragOffset.dy * 0.015;
+                            currentScaleVal = Math.max(0.5, Math.min(5, resizeStartScale + deltaScale));
+                        }
+                    }
+
+                    const h = 16 * currentScaleVal;
+                    const boxWidth = currentWidth;
+                    const boxHeight = h;
+                    const pad = 4;
+                    const drawX = -pad;
+                    const drawY = -pad;
+                    const drawWidth = boxWidth + (pad * 2);
+                    const drawHeight = boxHeight + (pad * 2);
+
+                    const color = isSelectedAnn ? '#3b82f6' : (ann.color || 'black');
+                    
+                    const isClosed = ann.type === 'ending_closed';
+                    const linePath = isClosed 
+                        ? `M 0 ${h} L 0 0 L ${currentWidth} 0 L ${currentWidth} ${h}`
+                        : `M 0 ${h} L 0 0 L ${currentWidth} 0`;
+
+                    return (
+                        <g
+                            key={ann.id}
+                            className={`cursor-move ${ann.hidden ? 'opacity-30 print:hidden' : ''}`}
+                            transform={`translate(${currentOffsetX}, ${currentOffsetY})`}
+                            onPointerDown={(e) => handleAnnotationPointerDown(e, ann.id)}
+                            onPointerMove={handleAnnotationPointerMove}
+                            onPointerUp={(e) => handleAnnotationPointerUp(e, ann.id)}
+                            onPointerCancel={(e) => handleAnnotationPointerUp(e, ann.id)}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            {isSelectedAnn && (
+                                <rect x={drawX} y={drawY} width={drawWidth} height={drawHeight} fill="transparent" stroke="#3b82f6" strokeWidth={1} strokeDasharray="2,2" />
+                            )}
+                            <rect x={drawX} y={drawY} width={drawWidth} height={drawHeight} fill="transparent" />
+                            <path d={linePath} stroke={color} strokeWidth={1.5} fill="none" />
+                            <text x={4 * currentScaleVal} y={12 * currentScaleVal} fontSize={12 * currentScaleVal} fontWeight="bold" fontFamily="serif" fill={color}>
+                                {ann.value}
+                            </text>
+                            
+                            {/* Resize Handles */}
+                            {isSelectedAnn && (
+                                <>
+                                    <rect
+                                        x={drawX + drawWidth - 3}
+                                        y={drawY + drawHeight / 2 - 3}
+                                        width={6}
+                                        height={6}
+                                        fill="white"
+                                        stroke="#ec4899"
+                                        strokeWidth={1}
+                                        className="cursor-ew-resize print:hidden"
+                                        onPointerDown={(e) => handleResizePointerDown(e, ann.id, currentScaleVal, ann.type, ann.width || 50, 'width')}
+                                        onPointerMove={handleResizePointerMove}
+                                        onPointerUp={(e) => handleResizePointerUp(e, ann.id)}
+                                        onPointerCancel={(e) => handleResizePointerUp(e, ann.id)}
+                                    />
+                                    <rect
+                                        x={drawX + drawWidth - 3}
+                                        y={drawY + drawHeight - 3}
+                                        width={6}
+                                        height={6}
+                                        fill="white"
+                                        stroke="#3b82f6"
+                                        strokeWidth={1}
+                                        className="cursor-nwse-resize print:hidden"
+                                        onPointerDown={(e) => handleResizePointerDown(e, ann.id, currentScaleVal, ann.type, ann.width || 50, 'scale')}
+                                        onPointerMove={handleResizePointerMove}
+                                        onPointerUp={(e) => handleResizePointerUp(e, ann.id)}
+                                        onPointerCancel={(e) => handleResizePointerUp(e, ann.id)}
+                                    />
+                                </>
+                            )}
+                        </g>
+                    );
+                }
 
                 if (ann.type === 'line') {
                     const isCresc = ann.value.toLowerCase() === 'crescendo';
@@ -900,9 +989,13 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                     let currentScaleVal = ann.scale !== undefined ? ann.scale : 1;
 
                     if (resizingAnnotation?.id === ann.id) {
-                        currentWidth = Math.max(10, currentWidth + resizeDragOffset.dx);
-                        const deltaScale = resizeDragOffset.dy * 0.015;
-                        currentScaleVal = Math.max(0.5, Math.min(5, resizeStartScale + deltaScale));
+                        if (resizingAnnotation.mode !== 'scale') {
+                            currentWidth = Math.max(10, currentWidth + resizeDragOffset.dx);
+                        }
+                        if (resizingAnnotation.mode !== 'width') {
+                            const deltaScale = resizeDragOffset.dy * 0.015;
+                            currentScaleVal = Math.max(0.5, Math.min(5, resizeStartScale + deltaScale));
+                        }
                     }
 
                     const h = 10 * currentScaleVal;
@@ -936,22 +1029,38 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                             <rect x={drawX} y={drawY} width={drawWidth} height={drawHeight} fill="transparent" />
                             <path d={linePath} stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" fill="none" />
                             
-                            {/* Resize Handle */}
+                            {/* Resize Handles */}
                             {isSelectedAnn && (
-                                <rect
-                                    x={drawX + drawWidth - 3}
-                                    y={drawY + drawHeight - 3}
-                                    width={6}
-                                    height={6}
-                                    fill="white"
-                                    stroke="#3b82f6"
-                                    strokeWidth={1}
-                                    className="cursor-nwse-resize print:hidden"
-                                    onPointerDown={(e) => handleResizePointerDown(e, ann.id, currentScaleVal, ann.type, ann.width || 50)}
-                                    onPointerMove={handleResizePointerMove}
-                                    onPointerUp={(e) => handleResizePointerUp(e, ann.id)}
-                                    onPointerCancel={(e) => handleResizePointerUp(e, ann.id)}
-                                />
+                                <>
+                                    <rect
+                                        x={drawX + drawWidth - 3}
+                                        y={drawY + drawHeight / 2 - 3}
+                                        width={6}
+                                        height={6}
+                                        fill="white"
+                                        stroke="#ec4899"
+                                        strokeWidth={1}
+                                        className="cursor-ew-resize print:hidden"
+                                        onPointerDown={(e) => handleResizePointerDown(e, ann.id, currentScaleVal, ann.type, ann.width || 50, 'width')}
+                                        onPointerMove={handleResizePointerMove}
+                                        onPointerUp={(e) => handleResizePointerUp(e, ann.id)}
+                                        onPointerCancel={(e) => handleResizePointerUp(e, ann.id)}
+                                    />
+                                    <rect
+                                        x={drawX + drawWidth - 3}
+                                        y={drawY + drawHeight - 3}
+                                        width={6}
+                                        height={6}
+                                        fill="white"
+                                        stroke="#3b82f6"
+                                        strokeWidth={1}
+                                        className="cursor-nwse-resize print:hidden"
+                                        onPointerDown={(e) => handleResizePointerDown(e, ann.id, currentScaleVal, ann.type, ann.width || 50, 'scale')}
+                                        onPointerMove={handleResizePointerMove}
+                                        onPointerUp={(e) => handleResizePointerUp(e, ann.id)}
+                                        onPointerCancel={(e) => handleResizePointerUp(e, ann.id)}
+                                    />
+                                </>
                             )}
                         </g>
                     );
@@ -962,7 +1071,7 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                     const ar = ann.aspectRatio || 1;
 
                     if (resizingAnnotation?.id === ann.id) {
-                        const deltaScale = resizeDragOffset.dy * 0.015;
+                        const deltaScale = (resizeDragOffset.dx + resizeDragOffset.dy) * 0.015;
                         currentScaleVal = Math.max(0.1, Math.min(10, resizeStartScale + deltaScale));
                     }
 
@@ -978,7 +1087,7 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                     return (
                         <g
                             key={ann.id}
-                            className={`cursor-move ${ann.hidden ? 'opacity-30 print:hidden' : ''}`}
+                            className="cursor-move"
                             transform={`translate(${currentOffsetX}, ${currentOffsetY})`}
                             onPointerDown={(e) => handleAnnotationPointerDown(e, ann.id)}
                             onPointerMove={handleAnnotationPointerMove}
@@ -1035,6 +1144,39 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
                     />
                 );
             })}
+
+            {/* Key Center - Rendered strictly below the entire section container */}
+            {section.keyCenter && (
+                <g
+                    className={`cursor-pointer group select-none ${currentStyle.hideKeyCenter ? 'print:hidden' : ''}`}
+                    onPointerDown={(e) => handleStructuralPointerDown(e, 'keyCenter')}
+                    onPointerMove={handleStructuralPointerMove}
+                    onPointerUp={(e) => handleStructuralPointerUp(e, 'keyCenter')}
+                    onClick={(e) => e.stopPropagation()}
+                    transform={`translate(${(currentStyle.keyCenterOffset?.x || 0) + (draggingStructural === 'keyCenter' ? structuralDragOffset.x : 0)}, ${(currentStyle.keyCenterOffset?.y || 0) + (draggingStructural === 'keyCenter' ? structuralDragOffset.y : 0)})`}
+                >
+                    <rect 
+                        x={-4} 
+                        y={positioned.subtreeHeight + 4} 
+                        width={measureTextWidth(section.keyCenter, `${currentStyle.keyCenterFontSize || 11}px serif`) + 16} 
+                        height={24} 
+                        fill="transparent" 
+                    />
+                    <text
+                        x={4}
+                        y={positioned.subtreeHeight + 20}
+                        textAnchor="start"
+                        fontSize={currentStyle.keyCenterFontSize || 14}
+                        fontFamily="serif"
+                        fill={activeSelection.sectionId === section.id && activeSelection.type === 'keyCenter' ? '#2563eb' : (currentStyle.hideKeyCenter ? '#d1d5db' : (currentStyle.keyCenterColor || 'black'))}
+                        className="select-none"
+                        {...getFontStyle(currentStyle.keyCenterModifiers || [])}
+                        style={getFontStyle(currentStyle.keyCenterModifiers || [])}
+                    >
+                        {section.keyCenter}
+                    </text>
+                </g>
+            )}
         </g>
     );
 }

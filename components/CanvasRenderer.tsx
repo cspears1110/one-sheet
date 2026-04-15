@@ -144,7 +144,8 @@ export function CanvasRenderer() {
     const offsetX = 40 + ((currentConfig.maxWidth - scaledWidth) / 2);
 
     const handleDragOver = (e: React.DragEvent<SVGSVGElement>) => {
-        e.preventDefault(); // Necessary to allow dropping
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
     };
 
     const handleDrop = async (e: React.DragEvent<SVGSVGElement>) => {
@@ -174,23 +175,25 @@ export function CanvasRenderer() {
             let minDistance = Infinity;
             let closestAbsY = 0;
 
-            const allPositioned: { section: PositionedSection; absY: number }[] = [];
+            const allPositioned: { section: PositionedSection; absX: number; absY: number }[] = [];
             layoutStaves.forEach((staff) => {
-                const addSections = (secs: PositionedSection[], parentY: number) => {
+                const addSections = (secs: PositionedSection[], parentX: number, parentY: number) => {
                     secs.forEach((s) => {
+                        const absX = parentX + s.x;
                         const absY = parentY + s.y;
-                        allPositioned.push({ section: s, absY });
-                        addSections(s.children, absY);
+                        allPositioned.push({ section: s, absX, absY });
+                        addSections(s.children, absX, absY);
                     });
                 };
-                addSections(staff.sections, staff.y);
+                addSections(staff.sections, 0, staff.y);
             });
 
             if (allPositioned.length === 0) return null;
 
+            let closestAbsX = 0;
             for (const item of allPositioned) {
-                const { section: s, absY } = item;
-                const centerX = s.x + s.width / 2;
+                const { section: s, absX, absY } = item;
+                const centerX = absX + s.width / 2;
                 const centerY = absY + s.height / 2;
 
                 const dx = localPt.x - centerX;
@@ -200,6 +203,7 @@ export function CanvasRenderer() {
                 if (dist < minDistance) {
                     minDistance = dist;
                     closestSection = s;
+                    closestAbsX = absX;
                     closestAbsY = absY;
                 }
             }
@@ -207,7 +211,7 @@ export function CanvasRenderer() {
             if (closestSection) {
                 return {
                     closestSection,
-                    relativeX: localPt.x - closestSection.x,
+                    relativeX: localPt.x - closestAbsX,
                     relativeY: localPt.y - closestAbsY
                 };
             }
@@ -235,7 +239,7 @@ export function CanvasRenderer() {
                             offset: { x: relativeX, y: relativeY },
                             src,
                             aspectRatio,
-                            scale: 0.5
+                            scale: 1.0 // Start at full size for dropped files
                         };
 
                         updateCompositionAndSync((prev) => {
@@ -305,27 +309,29 @@ export function CanvasRenderer() {
     };
 
     const handleReparentAnnotation = (annId: string, fromSectionId: string, absoluteX: number, absoluteY: number) => {
-        const allPositioned: { section: PositionedSection, absY: number }[] = [];
+        const allPositioned: { section: PositionedSection, absX: number, absY: number }[] = [];
         layoutStaves.forEach(staff => {
-            const addSections = (secs: PositionedSection[], parentY: number) => {
+            const addSections = (secs: PositionedSection[], parentX: number, parentY: number) => {
                 secs.forEach(s => {
+                    const absX = parentX + s.x;
                     const absY = parentY + s.y;
-                    allPositioned.push({ section: s, absY });
-                    addSections(s.children, absY);
+                    allPositioned.push({ section: s, absX, absY });
+                    addSections(s.children, absX, absY);
                 });
             };
-            addSections(staff.sections, staff.y);
+            addSections(staff.sections, 0, staff.y);
         });
 
         if (allPositioned.length === 0) return false;
 
         let closestSection: PositionedSection | null = null;
         let minDistance = Infinity;
+        let closestAbsX = 0;
         let closestAbsY = 0;
 
         for (const item of allPositioned) {
-            const { section: s, absY } = item;
-            const centerX = s.x + (s.width / 2);
+            const { section: s, absX, absY } = item;
+            const centerX = absX + (s.width / 2);
             const centerY = absY + (s.height / 2);
             
             const dx = absoluteX - centerX;
@@ -335,12 +341,13 @@ export function CanvasRenderer() {
             if (dist < minDistance) {
                 minDistance = dist;
                 closestSection = s;
+                closestAbsX = absX;
                 closestAbsY = absY;
             }
         }
 
         if (closestSection && closestSection.section.id !== fromSectionId) {
-            const relativeX = absoluteX - closestSection.x;
+            const relativeX = absoluteX - closestAbsX;
             const relativeY = absoluteY - closestAbsY;
 
             updateCompositionAndSync(prev => {

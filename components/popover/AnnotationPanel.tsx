@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Trash2 } from 'lucide-react';
 
 interface AnnotationPanelProps {
@@ -61,16 +62,29 @@ export function AnnotationPanel({ annotation, onUpdate, onDelete }: AnnotationPa
                 </div>
             </div>
 
-            <div className="flex items-center justify-between border-t pt-4">
-                <div>
-                    <Label className="text-xs font-semibold block mb-1">Visibility</Label>
-                    <span className="text-xs text-muted-foreground">Hidden annotations appear ghosted.</span>
+            {(annotation.type === 'ending_open' || annotation.type === 'ending_closed') && (
+                <div className="space-y-2">
+                    <Label className="text-xs font-semibold">Ending Text</Label>
+                    <Input
+                        value={annotation.value}
+                        onChange={(e) => onUpdate({ value: e.target.value })}
+                        className="h-8 text-xs"
+                    />
                 </div>
-                <Switch
-                    checked={!annotation.hidden}
-                    onCheckedChange={(checked) => onUpdate({ hidden: !checked })}
-                />
-            </div>
+            )}
+
+            {annotation.type !== 'image' && (
+                <div className="flex items-center justify-between border-t pt-4">
+                    <div>
+                        <Label className="text-xs font-semibold block mb-1">Visibility</Label>
+                        <span className="text-xs text-muted-foreground">Hidden annotations appear ghosted.</span>
+                    </div>
+                    <Switch
+                        checked={!annotation.hidden}
+                        onCheckedChange={(checked) => onUpdate({ hidden: !checked })}
+                    />
+                </div>
+            )}
         </div>
     );
 }

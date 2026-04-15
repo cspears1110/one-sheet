@@ -3,7 +3,7 @@ import { useStore } from '../lib/store';
 import { Section, Annotation } from '../lib/types';
 import { v4 as uuidv4 } from 'uuid';
 import { Button } from '@/components/ui/button';
-import { SmuflSymbol } from './svg/SmuflComponents';
+import { SmuflSymbol, getSmuflBounds } from './svg/SmuflComponents';
 import { BravuraPaths } from '../lib/bravura-paths';
 import { Image as ImageIcon, Upload, Trash2 } from 'lucide-react';
 import { processImageFile } from '../lib/image-utils';
@@ -11,6 +11,7 @@ import { processImageFile } from '../lib/image-utils';
 export function AnnotationsEditor() {
     const { composition, updateCompositionAndSync, activeSelection, addToGallery, removeFromGallery } = useStore();
     const gallery = composition.imageGallery || [];
+    const [isDraggingOver, setIsDraggingOver] = React.useState(false);
 
     // Flatten all sections to find the selected one easily
     const flattenedSections = React.useMemo(() => {
@@ -65,9 +66,37 @@ export function AnnotationsEditor() {
         } catch (err) {
             console.error("Failed to process image upload", err);
         }
-        
+
         // Reset input for next same-file selection
         e.target.value = '';
+    };
+
+    const handleDrop = async (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDraggingOver(false);
+
+        const files = Array.from(e.dataTransfer.files);
+        const imageFiles = files.filter(f => f.type.startsWith('image/'));
+
+        for (const file of imageFiles) {
+            try {
+                const { src, aspectRatio } = await processImageFile(file);
+                addToGallery(src, aspectRatio);
+            } catch (err) {
+                console.error("Failed to process dropped image", err);
+            }
+        }
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+        setIsDraggingOver(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDraggingOver(false);
     };
 
     const dynamics = [
@@ -114,15 +143,31 @@ export function AnnotationsEditor() {
                     <path d="M 0 0 L 24 6 M 0 12 L 24 6" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" fill="none" />
                 </svg>
             )
+        },
+        {
+            type: 'ending_closed', key: '', val: '1.', label: 'First Ending', icon: (
+                <svg width="24" height="16" className="text-current overflow-visible">
+                    <path d="M 0 16 L 0 0 L 24 0 L 24 16" stroke="currentColor" strokeWidth={1.5} fill="none" />
+                    <text x="4" y="12" fontSize="12" fontWeight="bold" fill="currentColor" fontFamily="serif">1.</text>
+                </svg>
+            )
+        },
+        {
+            type: 'ending_open', key: '', val: '2.', label: 'Second Ending', icon: (
+                <svg width="24" height="16" className="text-current overflow-visible">
+                    <path d="M 0 16 L 0 0 L 24 0" stroke="currentColor" strokeWidth={1.5} fill="none" />
+                    <text x="4" y="12" fontSize="12" fontWeight="bold" fill="currentColor" fontFamily="serif">2.</text>
+                </svg>
+            )
         }
     ];
 
     const handleDragStart = (e: React.DragEvent<HTMLButtonElement | HTMLDivElement>, val: string, dType: string, extra?: any) => {
-        e.dataTransfer.setData('application/json', JSON.stringify({ 
-            type: 'new-annotation', 
-            value: val, 
+        e.dataTransfer.setData('application/json', JSON.stringify({
+            type: 'new-annotation',
+            value: val,
             annotationType: dType,
-            extra 
+            extra
         }));
         e.dataTransfer.effectAllowed = 'copy';
     };
@@ -150,9 +195,16 @@ export function AnnotationsEditor() {
                                 onDragStart={(e) => handleDragStart(e, d.val, d.type)}
                                 title={`Drag to canvas, or click to add ${d.label}`}
                             >
-                                <svg width="24" height="24" className="text-current overflow-visible">
-                                    <SmuflSymbol symbol={d.key as any} scale={0.024} transform="translate(12, 16)" />
-                                </svg>
+                                {(() => {
+                                    const b = getSmuflBounds(d.key as any);
+                                    const padX = b.width * 0.01;
+                                    const padY = b.height * 0.01;
+                                    return (
+                                        <svg viewBox={`${b.minX - padX} ${b.minY - padY} ${b.width + padX * 2} ${b.height + padY * 2}`} className="w-full h-full max-w-[100%] max-h-[100%] text-current overflow-visible">
+                                            <SmuflSymbol symbol={d.key as any} scale={1} />
+                                        </svg>
+                                    );
+                                })()}
                             </Button>
                         ))}
                     </div>
@@ -169,9 +221,16 @@ export function AnnotationsEditor() {
                                 onDragStart={(e) => handleDragStart(e, d.val, d.type)}
                                 title={`Drag to canvas, or click to add ${d.label}`}
                             >
-                                <svg width="24" height="50" className="text-current overflow-visible">
-                                    <SmuflSymbol symbol={d.key as any} scale={0.050} transform="translate(12, 36)" />
-                                </svg>
+                                {(() => {
+                                    const b = getSmuflBounds(d.key as any);
+                                    const padX = b.width * 0.01;
+                                    const padY = b.height * 0.01;
+                                    return (
+                                        <svg viewBox={`${b.minX - padX} ${b.minY - padY} ${b.width + padX * 2} ${b.height + padY * 2}`} className="w-full h-full max-w-[100%] max-h-[100%] text-current overflow-visible">
+                                            <SmuflSymbol symbol={d.key as any} scale={1} />
+                                        </svg>
+                                    );
+                                })()}
                             </Button>
                         ))}
                     </div>
@@ -188,9 +247,16 @@ export function AnnotationsEditor() {
                                 onDragStart={(e) => handleDragStart(e, d.val, d.type)}
                                 title={`Drag to canvas, or click to add ${d.label}`}
                             >
-                                <svg width="24" height="24" className="text-current overflow-visible">
-                                    <SmuflSymbol symbol={d.key as any} scale={0.035} transform="translate(12, 16)" />
-                                </svg>
+                                {(() => {
+                                    const b = getSmuflBounds(d.key as any);
+                                    const padX = b.width * 0.15;
+                                    const padY = b.height * 0.15;
+                                    return (
+                                        <svg viewBox={`${b.minX - padX} ${b.minY - padY} ${b.width + padX * 2} ${b.height + padY * 2}`} className="w-full h-full max-w-[70%] max-h-[70%] text-current overflow-visible">
+                                            <SmuflSymbol symbol={d.key as any} scale={1} />
+                                        </svg>
+                                    );
+                                })()}
                             </Button>
                         ))}
                     </div>
@@ -214,37 +280,45 @@ export function AnnotationsEditor() {
                         ))}
                     </div>
 
-                    <h4 className="text-sm font-medium mt-4">Images (Gallery)</h4>
-                    <div className="space-y-3">
+                    <div 
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                        className="space-y-3"
+                    >
                         <Button
                             variant="outline"
-                            className="w-full gap-2 text-xs h-10 border-dashed hover:border-primary hover:text-primary transition-colors"
+                            className={`w-full gap-2 text-xs h-10 border-dashed transition-all ${
+                                isDraggingOver 
+                                ? 'border-primary bg-primary/5 text-primary scale-[1.02]' 
+                                : 'hover:border-primary hover:text-primary'
+                            }`}
                             onClick={() => document.getElementById('image-upload')?.click()}
                         >
                             <Upload className="w-4 h-4" />
-                            Add to Library (JPG/PNG)
+                            {isDraggingOver ? 'Drop to Upload' : 'Add to Library (JPG/PNG)'}
                         </Button>
-                        <input 
+                        <input
                             id="image-upload"
                             type="file"
                             accept="image/*"
                             className="hidden"
                             onChange={handleImageUpload}
                         />
-                        
+
                         {gallery.length > 0 ? (
                             <div className="grid grid-cols-2 gap-2 mt-2">
                                 {gallery.map((item) => (
                                     <div key={item.id} className="relative group aspect-video border rounded-md overflow-hidden bg-muted/20 flex items-center justify-center p-1 shadow-sm hover:border-primary/50 transition-all">
-                                        <div 
+                                        <div
                                             className="w-full h-full cursor-grab active:cursor-grabbing flex items-center justify-center"
                                             draggable
                                             onDragStart={(e) => handleDragStart(e, 'photo', 'image', { src: item.src, aspectRatio: item.aspectRatio, scale: 0.5 })}
                                         >
-                                            <img 
-                                                src={item.src} 
-                                                alt="Gallery item" 
-                                                className="max-w-full max-h-full object-contain pointer-events-none" 
+                                            <img
+                                                src={item.src}
+                                                alt="Gallery item"
+                                                className="max-w-full max-h-full object-contain pointer-events-none"
                                             />
                                         </div>
                                         <Button

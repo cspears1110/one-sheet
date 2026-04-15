@@ -6,6 +6,40 @@ interface SmuflSymbolProps extends React.SVGProps<SVGGElement> {
     scale?: number;
 }
 
+export function getSmuflBounds(symbol: keyof typeof BravuraPaths) {
+    const pathData = BravuraPaths[symbol];
+    if (!pathData) return { minX: 0, maxX: 1000, minY: 0, maxY: 1000, width: 1000, height: 1000 };
+
+    let intrinsicMinX = 0;
+    let intrinsicMaxX = (pathData as any).width || 1000;
+    let intrinsicMinY = 0;
+    let intrinsicMaxY = 1000;
+
+    const nums = pathData.d.match(/-?\d+(\.\d+)?/g);
+    if (nums) {
+        intrinsicMinX = Infinity;
+        intrinsicMaxX = -Infinity;
+        intrinsicMinY = Infinity;
+        intrinsicMaxY = -Infinity;
+        for (let i = 0; i < nums.length; i += 2) {
+            const vx = Number(nums[i]);
+            const vy = Number(nums[i + 1]);
+            if (vx < intrinsicMinX) intrinsicMinX = vx;
+            if (vx > intrinsicMaxX) intrinsicMaxX = vx;
+            if (vy < intrinsicMinY) intrinsicMinY = vy;
+            if (vy > intrinsicMaxY) intrinsicMaxY = vy;
+        }
+    }
+    return {
+        minX: intrinsicMinX,
+        maxX: intrinsicMaxX,
+        minY: intrinsicMinY,
+        maxY: intrinsicMaxY,
+        width: intrinsicMaxX - intrinsicMinX,
+        height: intrinsicMaxY - intrinsicMinY
+    };
+}
+
 export function SmuflSymbol({ symbol, scale = 0.024, className, transform, ...props }: SmuflSymbolProps) {
     const pathData = BravuraPaths[symbol];
     if (!pathData) return null;

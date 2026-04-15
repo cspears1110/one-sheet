@@ -4,7 +4,7 @@ import { Composition, PageConfig, Section } from './types';
 import { serializeComposition } from './serializer';
 import { v4 as uuidv4 } from 'uuid';
 
-export type ActiveSelectionType = 'none' | 'startMeasure' | 'measureRange' | 'timeSignature' | 'brace' | 'title' | 'text' | 'tempo' | 'startBarline' | 'endBarline' | 'globalTitle' | 'globalSubtitle' | 'globalComposer' | 'globalArranger' | 'globalCreatedBy' | 'annotation';
+export type ActiveSelectionType = 'none' | 'startMeasure' | 'measureRange' | 'timeSignature' | 'brace' | 'title' | 'text' | 'tempo' | 'keyCenter' | 'startBarline' | 'endBarline' | 'globalTitle' | 'globalSubtitle' | 'globalComposer' | 'globalArranger' | 'globalCreatedBy' | 'annotation';
 
 export interface ActiveSelection {
     sectionId: string | null;
