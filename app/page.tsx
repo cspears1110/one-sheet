@@ -1,5 +1,6 @@
 'use client';
 
+import { cn } from '@/lib/utils';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
@@ -17,8 +18,21 @@ import {
   ChevronRight,
   Layout,
   Sun,
-  Moon
+  Moon,
+  Share,
+  Check,
+  Copy,
+  FileDown,
+  MoreVertical
 } from 'lucide-react';
+import { encodeComposition } from '../lib/sharing';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 
 import { Header } from '@/components/Header';
 import { MobileWarning } from '../components/MobileWarning';
@@ -58,9 +72,16 @@ export default function Home() {
     arranger: '',
     createdBy: ''
   });
+  const [sharingId, setSharingId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [shareDialog, setShareDialog] = useState<{ isOpen: boolean; url: string; title: string }>({
+    isOpen: false,
+    url: '',
+    title: ''
+  });
 
   const router = useRouter();
-  const { compositions, createNewComposition, deleteComposition } = useStore();
+  const { compositions, createNewComposition, deleteComposition, duplicateComposition } = useStore();
 
 
   useEffect(() => {
@@ -91,6 +112,31 @@ export default function Home() {
     });
     setIsCreateModalOpen(false);
     router.push(`/editor?id=${id}`);
+  };
+
+  const handleShare = async (e: React.MouseEvent, comp: any) => {
+    e.stopPropagation();
+    setSharingId(comp.id);
+
+    try {
+      const encoded = await encodeComposition(comp);
+      const url = `${window.location.origin}/view?data=${encoded}`;
+
+      setShareDialog({
+        isOpen: true,
+        url,
+        title: comp.title || 'Untitled Composition'
+      });
+    } catch (err) {
+      console.error('Failed to share:', err);
+    } finally {
+      setSharingId(null);
+    }
+  };
+
+  const handleDuplicate = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    duplicateComposition(id);
   };
 
   return (
@@ -244,23 +290,65 @@ export default function Home() {
                   className="group relative bg-card border border-border rounded-3xl p-6 shadow-sm hover:shadow-xl hover:shadow-zinc-200/20 dark:hover:shadow-zinc-950/50 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all cursor-pointer"
                   onClick={() => router.push(`/editor?id=${comp.id}`)}
                 >
-                  <div className="flex justify-between items-start mb-6">
-                    <div className="p-3 bg-muted rounded-2xl group-hover:bg-accent transition-colors">
-                      <Layout className="h-6 w-6 text-muted-foreground group-hover:text-foreground transition-colors" />
+                    <div className="flex justify-between items-start mb-6">
+                      <div className="p-3 bg-muted rounded-2xl group-hover:bg-accent transition-colors">
+                        <Layout className="h-6 w-6 text-muted-foreground group-hover:text-foreground transition-colors" />
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 rounded-xl text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 transition-all opacity-0 group-hover:opacity-100"
+                          >
+                            <MoreVertical className="h-5 w-5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48 rounded-2xl p-1 shadow-2xl border-none bg-white">
+                          <DropdownMenuItem 
+                            onClick={(e) => handleShare(e, comp)}
+                            disabled={sharingId === comp.id}
+                            className="rounded-xl py-2.5 px-3 cursor-pointer"
+                          >
+                            <Share className="h-4 w-4 mr-2 text-zinc-500" />
+                            <span className="font-medium text-sm">Share...</span>
+                          </DropdownMenuItem>
+                          
+                          <DropdownMenuItem 
+                            onClick={(e) => handleDuplicate(e, comp.id)}
+                            className="rounded-xl py-2.5 px-3 cursor-pointer"
+                          >
+                            <Copy className="h-4 w-4 mr-2 text-zinc-500" />
+                            <span className="font-medium text-sm">Duplicate</span>
+                          </DropdownMenuItem>
+
+                          <DropdownMenuItem 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/editor?id=${comp.id}&print=true`);
+                            }}
+                            className="rounded-xl py-2.5 px-3 cursor-pointer"
+                          >
+                            <FileDown className="h-4 w-4 mr-2 text-zinc-500" />
+                            <span className="font-medium text-sm">Download PDF</span>
+                          </DropdownMenuItem>
+
+                          <DropdownMenuSeparator className="bg-zinc-100 my-1" />
+                          
+                          <DropdownMenuItem 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCompositionToDelete({ id: comp.id, title: comp.title || 'Untitled Composition' });
+                              setIsDeleteModalOpen(true);
+                            }}
+                            className="rounded-xl py-2.5 px-3 cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            <span className="font-medium text-sm">Delete</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-9 w-9 rounded-xl text-zinc-300 hover:text-red-500 hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setCompositionToDelete({ id: comp.id, title: comp.title || 'Untitled Composition' });
-                        setIsDeleteModalOpen(true);
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
 
                   <div className="space-y-4">
                     <div>
@@ -339,6 +427,68 @@ export default function Home() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Share Dialog */}
+        <Dialog open={shareDialog.isOpen} onOpenChange={(open) => setShareDialog(prev => ({ ...prev, isOpen: open }))}>
+          <DialogContent className="sm:max-w-[460px] border-none shadow-2xl rounded-3xl p-0 bg-white overflow-hidden">
+            <div className="bg-zinc-950 px-8 py-10 text-white relative">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+              <DialogHeader className="relative z-10">
+                <DialogTitle className="text-2xl font-bold tracking-tight mb-2">Share {shareDialog.title}</DialogTitle>
+                <DialogDescription className="text-zinc-400 text-sm">
+                  Anyone with this link can view and locally import this OneSheet. Edits made to your OneSheet are not visible to those who import it.
+                </DialogDescription>
+              </DialogHeader>
+            </div>
+
+            <div className="px-8 py-8 space-y-6">
+              <div className="space-y-3">
+                <Label className="text-xs font-bold uppercase tracking-wider text-zinc-400">Public Share Link</Label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Input
+                      readOnly
+                      value={shareDialog.url}
+                      className="h-12 bg-zinc-50 border border-zinc-200 focus:ring-0 rounded-xl text-xs pr-4 overflow-hidden text-ellipsis selection:bg-blue-100 selection:text-blue-900"
+                    />
+                  </div>
+                  <Button
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(shareDialog.url);
+                      setCopiedId('dialog');
+                      setTimeout(() => setCopiedId(null), 2000);
+                    }}
+                    className={cn(
+                      "h-12 px-6 rounded-xl font-bold transition-all shrink-0 shadow-lg shadow-zinc-950/20 active:scale-95",
+                      copiedId === 'dialog' ? "bg-green-500 hover:bg-green-600 text-white" : "bg-zinc-950 hover:bg-zinc-900 text-white"
+                    )}
+                  >
+                    {copiedId === 'dialog' ? (
+                      <>
+                        <Check className="w-4 h-4 mr-2" />
+                        Copied
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4 mr-2" />
+                        Copy Link
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 p-4 bg-zinc-50 rounded-2xl border border-zinc-100">
+                <div className="p-2 bg-white rounded-xl shadow-sm">
+                  <Share className="w-4 h-4 text-zinc-400" />
+                </div>
+                <p className="text-[11px] text-zinc-500 font-medium leading-relaxed">
+                  This link contains the entire project data. Large projects with many images may result in longer URLs.
+                </p>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <footer className="mt-24 pb-12 border-t border-zinc-100 pt-8 text-center text-zinc-400 text-sm font-medium tracking-wide">
           © 2026 — Created by <span className="text-zinc-600">Coleman Spears</span>. <span className="opacity-50 ml-2">v{process.env.NEXT_PUBLIC_APP_VERSION}</span>

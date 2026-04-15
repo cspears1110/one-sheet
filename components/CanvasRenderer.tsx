@@ -10,18 +10,27 @@ import { SectionRenderer } from './svg/SectionRenderer';
 import { HeaderRenderer } from './svg/HeaderRenderer';
 import { processImageFile } from '../lib/image-utils';
 
-export function CanvasRenderer() {
+export interface CanvasRendererProps {
+    readOnlyComposition?: Composition;
+    readOnly?: boolean;
+}
+
+export function CanvasRenderer({ readOnlyComposition, readOnly = false }: CanvasRendererProps = {}) {
+    const store = useStore();
+    
+    // Use external composition if provided, otherwise fallback to store
+    const composition = readOnlyComposition || store.composition;
     const { 
-        composition, 
         activeSelection, 
         setActiveSelection, 
         updateCompositionAndSync,
         addToGallery 
-    } = useStore();
+    } = store;
 
     const pageConfig = composition.pageConfig || { size: 'letter', orientation: 'landscape' };
 
     useEffect(() => {
+        if (readOnly) return;
         const handleKeyDown = (e: KeyboardEvent) => {
             if (activeSelection.type === 'annotation' && activeSelection.annotationId && activeSelection.sectionId) {
                 if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -428,9 +437,9 @@ export function CanvasRenderer() {
                     height: 'auto',
                     aspectRatio: `${widthLimit} / ${heightLimit}`,
                 }}
-                onClick={() => setActiveSelection({ sectionId: null, type: 'none' })}
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}
+                onClick={() => !readOnly && setActiveSelection({ sectionId: null, type: 'none' })}
+                onDragOver={readOnly ? undefined : handleDragOver}
+                onDrop={readOnly ? undefined : handleDrop}
             >
                 {/* Unscaled exact physical layout for Document Header */}
                 <g transform="translate(40, 40)">

@@ -34,6 +34,8 @@ export interface AppState {
     generateSequence: (rows: { mark: string; start: number }[], mode: 'append' | 'replace', finalMeasure?: number) => void;
     addToGallery: (src: string, aspectRatio: number) => void;
     removeFromGallery: (id: string) => void;
+    importComposition: (comp: Composition) => string;
+    duplicateComposition: (id: string) => string;
 }
 
 const INITIAL_COMPOSITION: Composition = {
@@ -205,6 +207,42 @@ export const useStore = create<AppState>()(
                     rawText: serialized
                 };
             }),
+            importComposition: (comp) => {
+                const newId = uuidv4();
+                const imported: Composition = {
+                    ...comp,
+                    id: newId,
+                    updatedAt: Date.now()
+                };
+                
+                set(state => ({
+                    compositions: [imported, ...state.compositions],
+                    composition: imported,
+                    rawText: serializeComposition(imported)
+                }));
+                
+                return newId;
+            },
+            duplicateComposition: (id) => {
+                const found = get().compositions.find(c => c.id === id);
+                if (!found) return '';
+
+                const newId = uuidv4();
+                const clone = JSON.parse(JSON.stringify(found));
+                
+                const duplicated: Composition = {
+                    ...clone,
+                    id: newId,
+                    title: found.title ? `${found.title} (Copy)` : 'Untitled Composition (Copy)',
+                    updatedAt: Date.now()
+                };
+
+                set(state => ({
+                    compositions: [duplicated, ...state.compositions]
+                }));
+
+                return newId;
+            },
         }),
         {
             name: 'one-sheet-storage',

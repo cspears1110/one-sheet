@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { TextEditor } from '../../components/TextEditor';
 import { CanvasRenderer } from '../../components/CanvasRenderer';
@@ -17,6 +17,7 @@ function EditorContent() {
   
   const [hydrated, setHydrated] = useState(false);
   const { loadComposition } = useStore();
+  const triggeredRef = useRef(false);
 
   useEffect(() => {
     setHydrated(true);
@@ -24,9 +25,22 @@ function EditorContent() {
        const success = loadComposition(id);
        if (!success) {
          router.push('/');
+         return;
+       }
+
+       // Handle auto-print if requested via URL param
+       if (searchParams.get('print') === 'true' && !triggeredRef.current) {
+         triggeredRef.current = true;
+         setTimeout(() => {
+           window.print();
+           // Remove the print param after triggering
+           const newParams = new URLSearchParams(searchParams.toString());
+           newParams.delete('print');
+           router.replace(`/editor?${newParams.toString()}`, { scroll: false });
+         }, 800);
        }
     }
-  }, [id, loadComposition, router]);
+  }, [id, loadComposition, router, searchParams]);
 
   if (!hydrated) return null;
 
