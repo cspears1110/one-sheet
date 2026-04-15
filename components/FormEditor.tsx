@@ -657,11 +657,19 @@ export function FormEditor() {
                             <Label htmlFor="subsection-count" className="text-xs font-semibold">Number of Sub-sections</Label>
                             <Input
                                 id="subsection-count"
-                                type="number"
-                                min="1"
-                                max="20"
-                                value={addSubsectionDialog.count}
-                                onChange={(e) => setAddSubsectionDialog(prev => ({ ...prev, count: parseInt(e.target.value) || 1 }))}
+                                type="text"
+                                value={addSubsectionDialog.count || ''}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (val === '') {
+                                        setAddSubsectionDialog(prev => ({ ...prev, count: 0 }));
+                                    } else {
+                                        const parsed = parseInt(val, 10);
+                                        if (!isNaN(parsed)) {
+                                            setAddSubsectionDialog(prev => ({ ...prev, count: parsed }));
+                                        }
+                                    }
+                                }}
                                 className="h-9"
                                 autoFocus
                             />
