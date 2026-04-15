@@ -609,7 +609,7 @@ export function SectionRenderer({ positioned, level = 1, isFirstChild = false, i
 
             {/* Start Measure Number Interactive Group */}
             {!isFirstChild && !hideStartMeasure && (() => {
-                const smText = section.startMeasureLabel || positioned.startMeasure.toString();
+                const smText = currentStyle.startMeasureLabel || section.startMeasureLabel || positioned.startMeasure.toString();
                 const fontSize = currentStyle.startMeasureFontSize || globalStyle.startMeasureFontSize || 11;
                 const smFont = (currentStyle.startMeasureTextModifiers || ['bold']).includes('bold') ? `bold ${fontSize}px sans-serif` : `${fontSize}px sans-serif`;
                 const smWidth = measureTextWidth(smText, smFont);

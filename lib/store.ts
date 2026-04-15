@@ -151,7 +151,7 @@ export const useStore = create<AppState>()(
                         subSections: [],
                         annotations: [],
                         style: row.mark.trim() ? {
-                            startMeasureTextOverride: row.mark,
+                            startMeasureLabel: row.mark,
                             startMeasureShape: 'square',
                             startMeasureTextModifiers: ['bold']
                         } : {}

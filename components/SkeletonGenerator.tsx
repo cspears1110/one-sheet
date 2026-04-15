@@ -77,7 +77,7 @@ export function SkeletonGenerator() {
         // Single uppercase letter (Rehearsal Letters A, B, C...)
         if (/^[A-Z]$/.test(mark)) {
             const code = mark.charCodeAt(0);
-            if (mark === 'Z') return ''; 
+            if (mark === 'Z') return '';
             return String.fromCharCode(code + 1);
         }
 
@@ -95,14 +95,29 @@ export function SkeletonGenerator() {
             const rowIndex = newRows.findIndex(r => r.id === id);
             if (rowIndex === -1) return prev;
 
-            const row = newRows[rowIndex];
+            const row = { ...newRows[rowIndex] };
 
             if (field === 'mark') {
+                const oldMark = row.mark;
                 row.mark = value;
+
+                const prevRow = rowIndex > 0 ? prev[rowIndex - 1] : null;
+                const predictedNext = prevRow ? predictNextMark(prevRow) : '';
+
+                // Sync Start Measure if it looks like the user is using Measure Numbers as Labels
+                // We SKIP the sync if the Typed value matches the predicted incremental Rehearsal Number (1,2,3...)
+                if (/^\d+$/.test(value) && value !== predictedNext) {
+                    const numValue = parseInt(value, 10);
+                    // Only auto-sync if 'start' is currently empty or it was previously synced with the old 'mark'
+                    if (row.start === '' || row.start.toString() === oldMark) {
+                        row.start = numValue;
+                    }
+                }
             } else if (field === 'start') {
                 row.start = value === '' ? '' : parseInt(value, 10) || '';
             }
 
+            newRows[rowIndex] = row;
             return newRows;
         });
     };
@@ -120,7 +135,21 @@ export function SkeletonGenerator() {
             const newRows = [...prev];
             // Clear any previous autofocus flags
             const cleanRows = newRows.map(r => ({ ...r, autoFocusMark: false, autoFocusStart: false }));
-            return [...cleanRows, { id: Date.now().toString(), mark: lastRow ? predictNextMark(lastRow) : '', start: '', autoFocusStart: true }];
+
+            const nextMark = lastRow ? predictNextMark(lastRow) : '';
+            // Detect if we are in "Measure Number as Label" mode
+            const isMeasureAsLabelMode = lastRow && lastRow.mark !== '' && lastRow.mark === lastRow.start.toString();
+
+            // If we detected the pattern or there's no predicted next mark, focus the Mark field
+            const focusMark = !nextMark || isMeasureAsLabelMode;
+
+            return [...cleanRows, {
+                id: Date.now().toString(),
+                mark: nextMark,
+                start: '',
+                autoFocusMark: focusMark,
+                autoFocusStart: !focusMark
+            }];
         });
     };
 
@@ -128,7 +157,7 @@ export function SkeletonGenerator() {
         if (mode === 'replace') {
             const { sections } = useStore.getState().composition;
             const isProjectEmpty = sections.length <= 1 && (!sections[0] || (sections[0].title === '' && sections[0].editorLabel === '' && sections[0].startMeasure === 1));
-            
+
             if (!isProjectEmpty) {
                 setShowReplaceWarning(true);
                 return;
@@ -153,7 +182,7 @@ export function SkeletonGenerator() {
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="hidden sm:flex gap-2">
+                <Button variant="outline" size="sm" type="button" tabIndex={0} className="hidden sm:flex gap-2">
                     <Wand2 className="w-4 h-4" />
                     Quick Skeleton
                 </Button>
@@ -195,6 +224,8 @@ export function SkeletonGenerator() {
                                 <Button
                                     variant="ghost"
                                     size="icon"
+                                    type="button"
+                                    tabIndex={0}
                                     onClick={() => removeRow(row.id)}
                                     disabled={rows.length === 1}
                                     className="text-muted-foreground hover:text-destructive"
@@ -206,7 +237,14 @@ export function SkeletonGenerator() {
                     </div>
 
                     <div className="flex items-center justify-between pt-2 border-t mt-2">
-                        <Button variant="ghost" size="sm" onClick={addManualRow} className="gap-2 text-muted-foreground">
+                        <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            type="button"
+                            tabIndex={0}
+                            onClick={addManualRow} 
+                            className="gap-2 text-muted-foreground"
+                        >
                             <Plus className="w-4 h-4" />
                             Add Row
                         </Button>
@@ -226,10 +264,10 @@ export function SkeletonGenerator() {
                 </div>
 
                 <DialogFooter className="flex-col sm:flex-row gap-2 pt-4">
-                    <Button variant="secondary" onClick={() => handleGenerateClick('append')} className="w-full sm:w-auto">
+                    <Button variant="secondary" type="button" tabIndex={0} onClick={() => handleGenerateClick('append')} className="w-full sm:w-auto">
                         Append to Canvas
                     </Button>
-                    <Button variant="default" onClick={() => handleGenerateClick('replace')} className="w-full sm:w-auto">
+                    <Button variant="default" type="button" tabIndex={0} onClick={() => handleGenerateClick('replace')} className="w-full sm:w-auto">
                         Replace Canvas
                     </Button>
                 </DialogFooter>
@@ -244,8 +282,8 @@ export function SkeletonGenerator() {
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => executeGenerate('replace')} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                        <AlertDialogCancel type="button" tabIndex={0}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction type="button" tabIndex={0} onClick={() => executeGenerate('replace')} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                             Replace Canvas
                         </AlertDialogAction>
                     </AlertDialogFooter>

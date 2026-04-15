@@ -4,6 +4,7 @@ import { SectionStyle } from './types';
 export const stylePropertyMap: Record<string, keyof SectionStyle> = {
     // Start Measure
     StartMeasureShape: 'startMeasureShape',
+    StartMeasureLabel: 'startMeasureLabel',
     StartMeasureTextModifiers: 'startMeasureTextModifiers',
     HideStartMeasure: 'hideStartMeasure',
     StartMeasureColor: 'startMeasureColor',

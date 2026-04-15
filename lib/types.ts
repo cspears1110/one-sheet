@@ -14,6 +14,7 @@ export interface Annotation {
 export interface SectionStyle {
   // Start Measure
   startMeasureShape?: 'square' | 'circle' | 'none';
+  startMeasureLabel?: string;
   startMeasureTextModifiers?: ('bold' | 'italic' | 'underline')[];
   startMeasureColor?: string;
   startMeasureFontSize?: number;
