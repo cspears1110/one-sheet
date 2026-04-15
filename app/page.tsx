@@ -120,8 +120,10 @@ export default function Home() {
 
     try {
       const encoded = await encodeComposition(comp);
-      const url = `${window.location.origin}/view?data=${encoded}`;
-
+      // Construct URL that respects subdirectories (like GitHub Pages)
+      const baseUrl = window.location.origin + window.location.pathname.replace(/\/$/, "");
+      const url = `${baseUrl}/view?data=${encoded}`;
+      
       setShareDialog({
         isOpen: true,
         url,
