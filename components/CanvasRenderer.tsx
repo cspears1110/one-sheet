@@ -4,7 +4,7 @@ import React, { useMemo, useEffect } from 'react';
 import { useStore } from '../lib/store';
 import { computeLayout, getLayoutConfig, PositionedSection } from '../lib/layout';
 import { SmuflSymbol } from './svg/SmuflComponents';
-import { Section, Annotation } from '../lib/types';
+import { Section, Annotation, Composition } from '../lib/types';
 import { v4 as uuidv4 } from 'uuid';
 import { SectionRenderer } from './svg/SectionRenderer';
 import { HeaderRenderer } from './svg/HeaderRenderer';
